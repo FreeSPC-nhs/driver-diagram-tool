@@ -4,6 +4,21 @@
 var nodes = [];
 var nextId = 1;
 
+// Level ordering for parent/child logic
+var levelOrder = ["aim", "primary", "secondary", "change"];
+
+function getPreviousLevel(level) {
+  var idx = levelOrder.indexOf(level);
+  if (idx > 0) return levelOrder[idx - 1];
+  return null;
+}
+
+function getNextLevel(level) {
+  var idx = levelOrder.indexOf(level);
+  if (idx >= 0 && idx < levelOrder.length - 1) return levelOrder[idx + 1];
+  return null;
+}
+
 function createNode(options) {
   options = options || {};
   var id = options.id;
@@ -57,7 +72,7 @@ function renderDiagram() {
   // Clear columns
   columnsContainer.innerHTML = "";
 
-  var levels = ["aim", "primary", "secondary", "change"];
+  var levels = levelOrder.slice();
   var levelTitles = {
     aim: "Aim",
     primary: "Primary drivers",
@@ -85,7 +100,42 @@ function renderDiagram() {
       var box = document.createElement("div");
       box.className = "diagram-node level-" + level;
       box.setAttribute("data-id", node.id);
-      box.textContent = node.text;
+
+      // Add buttons for parent/child
+      var prevLevel = getPreviousLevel(level);
+      var nextLevel = getNextLevel(level);
+
+      if (prevLevel) {
+        var leftBtn = document.createElement("button");
+        leftBtn.type = "button";
+        leftBtn.className = "diagram-add diagram-add-left";
+        leftBtn.textContent = "+";
+        leftBtn.title = "Add " + getLevelLabel(prevLevel) + " (parent)";
+        leftBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          addParentForNode(node.id);
+        });
+        box.appendChild(leftBtn);
+      }
+
+      if (nextLevel) {
+        var rightBtn = document.createElement("button");
+        rightBtn.type = "button";
+        rightBtn.className = "diagram-add diagram-add-right";
+        rightBtn.textContent = "+";
+        rightBtn.title = "Add " + getLevelLabel(nextLevel) + " (child)";
+        rightBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          addChildForNode(node.id);
+        });
+        box.appendChild(rightBtn);
+      }
+
+      // Text content in a span so it doesn't interfere with buttons
+      var textSpan = document.createElement("span");
+      textSpan.textContent = node.text;
+      box.appendChild(textSpan);
+
       col.appendChild(box);
     });
 
@@ -94,7 +144,6 @@ function renderDiagram() {
 
   // Draw connecting lines after layout has happened
   if (!window.requestAnimationFrame) {
-    // Fallback if rAF not available
     drawConnections(canvas, svg);
   } else {
     window.requestAnimationFrame(function () {
@@ -132,7 +181,8 @@ function drawConnections(canvas, svg) {
     var midX = (x1 + x2) / 2;
 
     var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    var d = "M " + x1 + " " + y1 +
+    var d =
+      "M " + x1 + " " + y1 +
       " C " + midX + " " + y1 +
       ", " + midX + " " + y2 +
       ", " + x2 + " " + y2;
@@ -242,7 +292,7 @@ function updateAllViews() {
   renderDiagram();
 }
 
-/* ---------- Actions ---------- */
+/* ---------- Actions from the form ---------- */
 
 function addNodeFromForm() {
   var textEl = document.getElementById("nodeText");
@@ -266,6 +316,63 @@ function addNodeFromForm() {
   textEl.value = "";
   updateAllViews();
 }
+
+/* ---------- Actions from + buttons ---------- */
+
+function addParentForNode(nodeId) {
+  var refNode = nodes.find(function (n) { return n.id === nodeId; });
+  if (!refNode) return;
+
+  var prevLevel = getPreviousLevel(refNode.level);
+  if (!prevLevel) {
+    alert("This item is already at the highest level.");
+    return;
+  }
+
+  var defaultPrompt = "Enter text for new " + getLevelLabel(prevLevel) + " (parent)";
+  var text = window.prompt(defaultPrompt, "");
+  if (!text) return;
+
+  // New parent inherits old parent (if any)
+  var newNode = createNode({
+    level: prevLevel,
+    text: text.trim(),
+    parentId: refNode.parentId
+  });
+
+  nodes.push(newNode);
+
+  // Reference node now points to the new parent
+  refNode.parentId = newNode.id;
+
+  updateAllViews();
+}
+
+function addChildForNode(nodeId) {
+  var refNode = nodes.find(function (n) { return n.id === nodeId; });
+  if (!refNode) return;
+
+  var nextLevel = getNextLevel(refNode.level);
+  if (!nextLevel) {
+    // No further level; keep same level for extra children
+    nextLevel = refNode.level;
+  }
+
+  var defaultPrompt = "Enter text for new " + getLevelLabel(nextLevel) + " (child)";
+  var text = window.prompt(defaultPrompt, "");
+  if (!text) return;
+
+  var newNode = createNode({
+    level: nextLevel,
+    text: text.trim(),
+    parentId: refNode.id
+  });
+
+  nodes.push(newNode);
+  updateAllViews();
+}
+
+/* ---------- Clear / delete ---------- */
 
 function clearAllNodes() {
   if (!window.confirm("Clear all items from this driver diagram?")) return;
@@ -375,7 +482,7 @@ function uploadCsv(file) {
 /* ---------- Init ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Driver Diagram Tool loaded with diagram.");
+  console.log("Driver Diagram Tool loaded with clickable add buttons.");
 
   var addBtn = document.getElementById("addNodeBtn");
   var clearBtn = document.getElementById("clearAllBtn");
