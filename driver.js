@@ -10,7 +10,7 @@ var diagramAppearance = {
   boxHeight: 32,      // px
   verticalGap: 8,     // px between boxes
   fontSize: 13,       // px
-  fontFamily: ""      // empty = inherit from page
+  fontFamily: "",      // empty = inherit from page
   fontBold: false
 };
 
@@ -500,8 +500,6 @@ function renderDiagram() {
       });
       box.appendChild(badge);
 
-
-      col.appendChild(box);
       stack.appendChild(box);
     });
 
