@@ -342,6 +342,47 @@ function refreshParentOptions() {
   }
 }
 
+function createColorSelectForNode(node) {
+  var select = document.createElement("select");
+  select.style.fontSize = "0.8rem";
+  select.style.padding = "0.2rem 0.3rem";
+
+  // "No colour" option
+  var noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "No colour";
+  select.appendChild(noneOpt);
+
+  // Options from configured colour list
+  colorOptions.forEach(function (opt) {
+    var o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    select.appendChild(o);
+  });
+
+  // If node has a colour not currently in colourOptions, show it as "Custom"
+  if (node.color) {
+    var found = colorOptions.some(function (c) { return c.value === node.color; });
+    if (!found) {
+      var customOpt = document.createElement("option");
+      customOpt.value = node.color;
+      customOpt.textContent = "Custom (" + node.color + ")";
+      select.appendChild(customOpt);
+    }
+  }
+
+  select.value = node.color || "";
+
+  select.addEventListener("change", function () {
+    node.color = select.value;
+    updateAllViews(); // re-draw diagram & table with new colour
+  });
+
+  return select;
+}
+
+
 function renderNodesTable() {
   var tableWrapper = document.getElementById("nodesTableWrapper");
   var tbody = document.getElementById("nodesTableBody");
@@ -361,7 +402,7 @@ function renderNodesTable() {
   noItemsMessage.style.display = "none";
 
   nodes.forEach(function (node) {
-    var tr = document.createElement("tr");
+        var tr = document.createElement("tr");
 
     var tdId = document.createElement("td");
     tdId.textContent = node.id;
@@ -370,6 +411,11 @@ function renderNodesTable() {
     var tdLevel = document.createElement("td");
     tdLevel.textContent = getLevelLabel(node.level);
     tr.appendChild(tdLevel);
+
+    // NEW: Colour dropdown
+    var tdColor = document.createElement("td");
+    tdColor.appendChild(createColorSelectForNode(node));
+    tr.appendChild(tdColor);
 
     var tdParent = document.createElement("td");
     if (node.parentId) {
@@ -397,6 +443,7 @@ function renderNodesTable() {
     });
     tdActions.appendChild(delBtn);
     tr.appendChild(tdActions);
+
 
     tbody.appendChild(tr);
   });
