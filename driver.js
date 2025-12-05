@@ -6,6 +6,7 @@ var nextId = 1;
 
 // Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
 var colorOptions = [];
+var editingColorIndex = -1; // which colour option is being edited (if any)
 
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
@@ -87,7 +88,13 @@ function refreshColorSelect() {
     select.appendChild(option);
   });
 
-  if (currentValue && (currentValue === "" || colorOptions.some(function (c) { return c.value === currentValue; }))) {
+  if (
+    currentValue &&
+    (currentValue === "" ||
+      colorOptions.some(function (c) {
+        return c.value === currentValue;
+      }))
+  ) {
     select.value = currentValue;
   }
 }
@@ -107,7 +114,28 @@ function renderColorOptionsList() {
 
   colorOptions.forEach(function (opt, index) {
     var li = document.createElement("li");
-    li.textContent = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
+    li.style.cursor = "pointer";
+    li.title = "Click to edit this colour";
+
+    var labelText = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
+    li.textContent = labelText;
+
+    if (index === editingColorIndex) {
+      li.style.fontWeight = "600";
+      li.style.textDecoration = "underline";
+    }
+
+    li.addEventListener("click", function () {
+      var labelInput = document.getElementById("colorLabelInput");
+      var valueInput = document.getElementById("colorValueInput");
+      if (!labelInput || !valueInput) return;
+
+      editingColorIndex = index;
+      labelInput.value = opt.label;
+      valueInput.value = opt.value;
+      renderColorOptionsList();
+    });
+
     list.appendChild(li);
   });
 }
@@ -128,17 +156,36 @@ function addColorOptionFromForm() {
     label = "Colour " + (colorOptions.length + 1);
   }
 
-  // Check if this colour value already exists; if so, update label
-  var existing = colorOptions.find(function (c) { return c.value.toLowerCase() === value.toLowerCase(); });
-  if (existing) {
-    existing.label = label;
+  if (editingColorIndex >= 0 && editingColorIndex < colorOptions.length) {
+    // Editing existing colour option
+    var oldValue = colorOptions[editingColorIndex].value;
+    colorOptions[editingColorIndex].label = label;
+    colorOptions[editingColorIndex].value = value;
+
+    // Update any nodes using the old colour value
+    nodes.forEach(function (n) {
+      if (n.color === oldValue) {
+        n.color = value;
+      }
+    });
+
+    editingColorIndex = -1;
   } else {
-    colorOptions.push({ label: label, value: value });
+    // Creating / updating by colour value
+    var existing = colorOptions.find(function (c) {
+      return c.value.toLowerCase() === value.toLowerCase();
+    });
+    if (existing) {
+      existing.label = label;
+    } else {
+      colorOptions.push({ label: label, value: value });
+    }
   }
 
   labelInput.value = "";
-  refreshColorSelect();
-  renderColorOptionsList();
+  // keep the last chosen colour in the colour picker for convenience
+
+  updateAllViews();
 }
 
 // When importing CSV, we may see colour values that aren't in colourOptions yet.
@@ -162,8 +209,37 @@ function rebuildColorOptionsFromNodes() {
     index++;
   }
 
+  editingColorIndex = -1;
   refreshColorSelect();
   renderColorOptionsList();
+}
+
+// Convert hex colour to { r, g, b }
+function hexToRgb(hex) {
+  if (!hex) return null;
+  var h = hex.replace("#", "").trim();
+  if (h.length === 3) {
+    h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  }
+  if (h.length !== 6) return null;
+
+  var r = parseInt(h.slice(0, 2), 16);
+  var g = parseInt(h.slice(2, 4), 16);
+  var b = parseInt(h.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+  return { r: r, g: g, b: b };
+}
+
+// Choose black or white text for best contrast
+function getContrastingTextColor(hex) {
+  var rgb = hexToRgb(hex);
+  if (!rgb) return "#000000";
+
+  // perceived brightness: https://www.w3.org/TR/AERT/#color-contrast
+  var brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+
+  // threshold around mid-grey
+  return brightness > 130 ? "#000000" : "#ffffff";
 }
 
 function cycleNodeColor(node) {
@@ -173,7 +249,11 @@ function cycleNodeColor(node) {
   }
 
   // Order: no colour (""), then each configured colour value
-  var palette = [""].concat(colorOptions.map(function (c) { return c.value; }));
+  var palette = [""].concat(
+    colorOptions.map(function (c) {
+      return c.value;
+    })
+  );
 
   var current = node.color || "";
   var currentIndex = palette.indexOf(current);
@@ -186,7 +266,6 @@ function cycleNodeColor(node) {
 
   updateAllViews();
 }
-
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
 
@@ -210,7 +289,9 @@ function renderDiagram() {
   // Group nodes by level
   var byLevel = {};
   levels.forEach(function (level) {
-    byLevel[level] = nodes.filter(function (n) { return n.level === level; });
+    byLevel[level] = nodes.filter(function (n) {
+      return n.level === level;
+    });
   });
 
   // Build columns
@@ -232,6 +313,11 @@ function renderDiagram() {
       if (node.color) {
         box.style.backgroundColor = node.color;
         box.style.borderColor = "#999";
+        box.style.color = getContrastingTextColor(node.color);
+      } else {
+        box.style.backgroundColor = "#ffffff";
+        box.style.borderColor = "#d0d7de";
+        box.style.color = "#000000";
       }
 
       // Add buttons for parent/child
@@ -274,19 +360,19 @@ function renderDiagram() {
       });
       box.appendChild(textSpan);
 
-    // Little colour badge that cycles through colours on click
-    var badge = document.createElement("div");
-    badge.className = "diagram-color-badge";
-    if (node.color) {
-      badge.style.backgroundColor = node.color;
-    } else {
-      badge.style.backgroundColor = "#ffffff";
-    }
-    badge.addEventListener("click", function (e) {
-      e.stopPropagation();
-      cycleNodeColor(node);
-    });
-    box.appendChild(badge);
+      // Little colour badge that cycles through colours on click
+      var badge = document.createElement("div");
+      badge.className = "diagram-color-badge";
+      if (node.color) {
+        badge.style.backgroundColor = node.color;
+      } else {
+        badge.style.backgroundColor = "#ffffff";
+      }
+      badge.addEventListener("click", function (e) {
+        e.stopPropagation();
+        cycleNodeColor(node);
+      });
+      box.appendChild(badge);
 
       col.appendChild(box);
     });
@@ -318,8 +404,12 @@ function drawConnections(canvas, svg) {
   nodes.forEach(function (node) {
     if (!node.parentId) return;
 
-    var parentEl = canvas.querySelector('.diagram-node[data-id="' + node.parentId + '"]');
-    var childEl = canvas.querySelector('.diagram-node[data-id="' + node.id + '"]');
+    var parentEl = canvas.querySelector(
+      '.diagram-node[data-id="' + node.parentId + '"]'
+    );
+    var childEl = canvas.querySelector(
+      '.diagram-node[data-id="' + node.id + '"]'
+    );
     if (!parentEl || !childEl) return;
 
     var parentRect = parentEl.getBoundingClientRect();
@@ -334,15 +424,27 @@ function drawConnections(canvas, svg) {
 
     var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     var d =
-      "M " + x1 + " " + y1 +
-      " C " + midX + " " + y1 +
-      ", " + midX + " " + y2 +
-      ", " + x2 + " " + y2;
+      "M " +
+      x1 +
+      " " +
+      y1 +
+      " C " +
+      midX +
+      " " +
+      y1 +
+      ", " +
+      midX +
+      " " +
+      y2 +
+      ", " +
+      x2 +
+      " " +
+      y2;
 
     path.setAttribute("d", d);
     path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "#666");      // darker line
-    path.setAttribute("stroke-width", "2.5"); // thicker line
+    path.setAttribute("stroke", "#666");
+    path.setAttribute("stroke-width", "2.5");
     path.setAttribute("stroke-linecap", "round");
 
     svg.appendChild(path);
@@ -373,7 +475,12 @@ function refreshParentOptions() {
     parentSelect.appendChild(opt);
   });
 
-  if (currentValue && nodes.some(function (n) { return n.id === currentValue; })) {
+  if (
+    currentValue &&
+    nodes.some(function (n) {
+      return n.id === currentValue;
+    })
+  ) {
     parentSelect.value = currentValue;
   }
 }
@@ -383,13 +490,11 @@ function createColorSelectForNode(node) {
   select.style.fontSize = "0.8rem";
   select.style.padding = "0.2rem 0.3rem";
 
-  // "No colour" option
   var noneOpt = document.createElement("option");
   noneOpt.value = "";
   noneOpt.textContent = "No colour";
   select.appendChild(noneOpt);
 
-  // Options from configured colour list
   colorOptions.forEach(function (opt) {
     var o = document.createElement("option");
     o.value = opt.value;
@@ -397,9 +502,10 @@ function createColorSelectForNode(node) {
     select.appendChild(o);
   });
 
-  // If node has a colour not currently in colourOptions, show it as "Custom"
   if (node.color) {
-    var found = colorOptions.some(function (c) { return c.value === node.color; });
+    var found = colorOptions.some(function (c) {
+      return c.value === node.color;
+    });
     if (!found) {
       var customOpt = document.createElement("option");
       customOpt.value = node.color;
@@ -412,12 +518,11 @@ function createColorSelectForNode(node) {
 
   select.addEventListener("change", function () {
     node.color = select.value;
-    updateAllViews(); // re-draw diagram & table with new colour
+    updateAllViews();
   });
 
   return select;
 }
-
 
 function renderNodesTable() {
   var tableWrapper = document.getElementById("nodesTableWrapper");
@@ -438,7 +543,7 @@ function renderNodesTable() {
   noItemsMessage.style.display = "none";
 
   nodes.forEach(function (node) {
-        var tr = document.createElement("tr");
+    var tr = document.createElement("tr");
 
     var tdId = document.createElement("td");
     tdId.textContent = node.id;
@@ -448,14 +553,16 @@ function renderNodesTable() {
     tdLevel.textContent = getLevelLabel(node.level);
     tr.appendChild(tdLevel);
 
-    // NEW: Colour dropdown
+    // Colour column
     var tdColor = document.createElement("td");
     tdColor.appendChild(createColorSelectForNode(node));
     tr.appendChild(tdColor);
 
     var tdParent = document.createElement("td");
     if (node.parentId) {
-      var parent = nodes.find(function (n) { return n.id === node.parentId; });
+      var parent = nodes.find(function (n) {
+        return n.id === node.parentId;
+      });
       tdParent.textContent = parent
         ? "[" + parent.id + "] " + getLevelLabel(parent.level)
         : "(Missing: " + node.parentId + ")";
@@ -479,7 +586,6 @@ function renderNodesTable() {
     });
     tdActions.appendChild(delBtn);
     tr.appendChild(tdActions);
-
 
     tbody.appendChild(tr);
   });
@@ -513,7 +619,12 @@ function addNodeFromForm() {
     return;
   }
 
-  var node = createNode({ level: level, text: text, parentId: parentId, color: color });
+  var node = createNode({
+    level: level,
+    text: text,
+    parentId: parentId,
+    color: color
+  });
   nodes.push(node);
 
   textEl.value = "";
@@ -523,7 +634,9 @@ function addNodeFromForm() {
 /* ---------- Edit existing node ---------- */
 
 function editNode(nodeId) {
-  var node = nodes.find(function (n) { return n.id === nodeId; });
+  var node = nodes.find(function (n) {
+    return n.id === nodeId;
+  });
   if (!node) return;
 
   var newText = window.prompt("Edit text for this item:", node.text);
@@ -544,7 +657,9 @@ function editNode(nodeId) {
 /* ---------- Actions from + buttons ---------- */
 
 function addParentForNode(nodeId) {
-  var refNode = nodes.find(function (n) { return n.id === nodeId; });
+  var refNode = nodes.find(function (n) {
+    return n.id === nodeId;
+  });
   if (!refNode) return;
 
   var prevLevel = getPreviousLevel(refNode.level);
@@ -553,7 +668,8 @@ function addParentForNode(nodeId) {
     return;
   }
 
-  var defaultPrompt = "Enter text for new " + getLevelLabel(prevLevel) + " (parent)";
+  var defaultPrompt =
+    "Enter text for new " + getLevelLabel(prevLevel) + " (parent)";
   var text = window.prompt(defaultPrompt, "");
   if (!text) return;
 
@@ -574,7 +690,9 @@ function addParentForNode(nodeId) {
 }
 
 function addChildForNode(nodeId) {
-  var refNode = nodes.find(function (n) { return n.id === nodeId; });
+  var refNode = nodes.find(function (n) {
+    return n.id === nodeId;
+  });
   if (!refNode) return;
 
   var nextLevel = getNextLevel(refNode.level);
@@ -583,7 +701,8 @@ function addChildForNode(nodeId) {
     nextLevel = refNode.level;
   }
 
-  var defaultPrompt = "Enter text for new " + getLevelLabel(nextLevel) + " (child)";
+  var defaultPrompt =
+    "Enter text for new " + getLevelLabel(nextLevel) + " (child)";
   var text = window.prompt(defaultPrompt, "");
   if (!text) return;
 
@@ -629,7 +748,9 @@ function deleteNode(id) {
     return;
   }
 
-  nodes = nodes.filter(function (n) { return !toDelete.has(n.id); });
+  nodes = nodes.filter(function (n) {
+    return !toDelete.has(n.id);
+  });
   updateNextIdFromNodes();
   updateAllViews();
 }
@@ -687,7 +808,9 @@ function uploadCsv(file) {
         var color = (row.color || "").toString().trim();
 
         if (!id || !level || !text) {
-          console.warn("Skipping row " + (index + 1) + " - missing id/level/text.");
+          console.warn(
+            "Skipping row " + (index + 1) + " - missing id/level/text."
+          );
           return;
         }
 
@@ -712,7 +835,7 @@ function uploadCsv(file) {
 /* ---------- Init ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Driver Diagram Tool loaded with colours.");
+  console.log("Driver Diagram Tool loaded with editable colours and contrast.");
 
   var addBtn = document.getElementById("addNodeBtn");
   var clearBtn = document.getElementById("clearAllBtn");
