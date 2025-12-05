@@ -368,8 +368,18 @@ function renderDiagram() {
     stack.className = "diagram-column-stack";
     col.appendChild(stack);
     
+    // Vertical distribution per column
     if (level === "aim" && byLevel[level].length === 1) {
       stack.style.justifyContent = "center";
+    } else {
+      stack.style.justifyContent = "space-evenly";
+    }
+
+    // Use verticalGap as padding at top/bottom of the stack
+    if (diagramAppearance) {
+      var pad = (diagramAppearance.verticalGap || 0) / 2;
+      stack.style.paddingTop = pad + "px";
+      stack.style.paddingBottom = pad + "px";
     }
 
     byLevel[level].forEach(function (node) {
@@ -380,7 +390,6 @@ function renderDiagram() {
 	// Apply appearance settings
     if (diagramAppearance) {
       box.style.minHeight = diagramAppearance.boxHeight + "px";
-      box.style.marginBottom = diagramAppearance.verticalGap + "px";
       box.style.fontSize = diagramAppearance.fontSize + "px";
       if (diagramAppearance.fontFamily) {
         box.style.fontFamily = diagramAppearance.fontFamily;
@@ -415,6 +424,7 @@ function renderDiagram() {
           leftBtn.style.height = h + "px";
           leftBtn.style.width = h + "px";
           leftBtn.style.borderRadius = (h / 2) + "px";
+	  leftBtn.style.left = -(h / 2) + "px";
         }	
 	// Match connector colour to node
 	if (node.color) {
@@ -451,7 +461,8 @@ function renderDiagram() {
           rightBtn.style.height = h2 + "px";
           rightBtn.style.width = h2 + "px";
           rightBtn.style.borderRadius = (h2 / 2) + "px";
-        }	
+	  rightBtn.style.right = -(h2 / 2) + "px"; 
+        }		
 	// Match connector colour to node
 	if (node.color) {
   	rightBtn.style.backgroundColor = node.color;
