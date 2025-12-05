@@ -158,11 +158,27 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 3.5rem;
     }
+    
+    /* Columns now have a separate stack for their nodes */
     .diagram-column {
       display: flex;
       flex-direction: column;
       gap: 0.35rem;
     }
+
+    .diagram-column-stack {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-evenly; /* spread nodes down the column */
+    }
+
+    /* For the Aim column, centre its single node vertically */
+    .diagram-column.aim-column .diagram-column-stack {
+      justify-content: center;
+    }
+
+
     .diagram-column-title {
       font-size: 0.8rem;
       font-weight: 600;

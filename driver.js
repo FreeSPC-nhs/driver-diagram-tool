@@ -345,11 +345,18 @@ function renderDiagram() {
   levels.forEach(function (level) {
     var col = document.createElement("div");
     col.className = "diagram-column";
+    if (level === "aim") {
+      col.classList.add("aim-column");
+    }
 
     var title = document.createElement("div");
     title.className = "diagram-column-title";
     title.textContent = levelTitles[level];
     col.appendChild(title);
+
+    var stack = document.createElement("div");
+    stack.className = "diagram-column-stack";
+    col.appendChild(stack);
 
     byLevel[level].forEach(function (node) {
       var box = document.createElement("div");
@@ -454,6 +461,7 @@ function renderDiagram() {
 
 
       col.appendChild(box);
+      stack.appendChild(box);
     });
 
     columnsContainer.appendChild(col);
