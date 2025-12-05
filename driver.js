@@ -194,8 +194,8 @@ function drawConnections(canvas, svg) {
 
     path.setAttribute("d", d);
     path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "#999");
-    path.setAttribute("stroke-width", "1.5");
+    path.setAttribute("stroke", "#666");
+    path.setAttribute("stroke-width", "2.5");
     path.setAttribute("stroke-linecap", "round");
 
     svg.appendChild(path);

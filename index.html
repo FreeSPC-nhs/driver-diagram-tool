@@ -98,10 +98,10 @@
     #diagramCanvasWrapper {
       border: 1px solid #e0e0e0;
       border-radius: 6px;
-      padding: 0.5rem;
+      padding: 0.4rem;
       margin-bottom: 0.75rem;
       background: #fafafa;
-      min-height: 220px;
+      min-height: 200px;
     }
     #diagramCanvas {
       position: relative;
@@ -118,12 +118,12 @@
       position: relative;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.75rem;
+      gap: 0.5rem;
     }
     .diagram-column {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.35rem;
     }
     .diagram-column-title {
       font-size: 0.8rem;
@@ -133,16 +133,18 @@
       margin-bottom: 0.25rem;
       color: #666;
     }
-        .diagram-node {
+       .diagram-node {
       position: relative;
       background: #ffffff;
-      border-radius: 6px;
+      border-radius: 4px;
       border: 1px solid #d0d7de;
-      padding: 0.4rem 1.6rem; /* extra space for the + buttons */
-      font-size: 0.85rem;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-	cursor: pointer;
+      padding: 0.25rem 1.2rem; /* smaller padding */
+      font-size: 0.8rem;       /* slightly smaller text */
+      line-height: 1.3;        /* tighter line height */
+      box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+      cursor: pointer;
     }
+
     .diagram-node.level-aim {
       border-left: 4px solid #005eb8;
     }
