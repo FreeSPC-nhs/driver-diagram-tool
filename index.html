@@ -285,6 +285,30 @@
       }
     }
 
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      margin-bottom: 0.25rem;
+    }
+    .collapsible-header span:first-child {
+      flex: 1;
+    }
+    .collapsible-indicator {
+      font-size: 0.8rem;
+      color: #555;
+      margin-left: 0.5rem;
+    }
+    .collapsible-section {
+      margin-bottom: 0.75rem;
+    }
+    .collapsible-section.is-collapsed {
+      display: none;
+    }
+
+
+
     @media (max-width: 800px) {
       main {
         grid-template-columns: 1fr;
@@ -293,6 +317,8 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
+
+
   </style>
 
   <!-- PapaParse for CSV import/export -->
@@ -322,81 +348,99 @@
   <main>
     <!-- Left column: data entry + CSV + colours -->
     <section class="card" id="controlsPanel">
-      <h2>1. Add items</h2>
+  <!-- Add items -->
+  <h2 class="collapsible-header" data-target="sectionAddItems">
+    <span>1. Add items</span>
+    <span class="collapsible-indicator">▾</span>
+  </h2>
+  <div id="sectionAddItems" class="collapsible-section">
+    <label for="nodeText">Text</label>
+    <textarea id="nodeText" placeholder="e.g. Reduce unplanned readmissions by 20% in 12 months"></textarea>
 
-      <label for="nodeText">Text</label>
-      <textarea id="nodeText" placeholder="e.g. Reduce unplanned readmissions by 20% in 12 months"></textarea>
+    <label for="nodeLevel">Level</label>
+    <select id="nodeLevel">
+      <option value="aim">Aim</option>
+      <option value="primary">Primary driver</option>
+      <option value="secondary">Secondary driver</option>
+      <option value="change">Change idea</option>
+    </select>
 
-      <label for="nodeLevel">Level</label>
-      <select id="nodeLevel">
-        <option value="aim">Aim</option>
-        <option value="primary">Primary driver</option>
-        <option value="secondary">Secondary driver</option>
-        <option value="change">Change idea</option>
-      </select>
+    <label for="nodeParent">Parent (optional)</label>
+    <select id="nodeParent">
+      <option value="">— None / top level —</option>
+    </select>
+    <p class="small">
+      Typically the <strong>aim</strong> is at the centre, primary drivers connect to
+      the aim, secondary drivers to a primary driver, and change ideas to a
+      secondary (or primary) driver.
+    </p>
 
-      <label for="nodeParent">Parent (optional)</label>
-      <select id="nodeParent">
-        <option value="">— None / top level —</option>
-      </select>
-      <p class="small">
-        Typically the <strong>aim</strong> is at the centre, primary drivers connect to
-        the aim, secondary drivers to a primary driver, and change ideas to a
-        secondary (or primary) driver.
-      </p>
+    <label for="nodeColor">Colour (optional)</label>
+    <select id="nodeColor">
+      <option value="">No colour</option>
+    </select>
+    <p class="small">
+      Colour options are defined below (e.g. “Primary 1”, “High impact”). If no colour is chosen,
+      boxes will be white.
+    </p>
 
-      <label for="nodeColor">Colour (optional)</label>
-      <select id="nodeColor">
-        <option value="">No colour</option>
-      </select>
-      <p class="small">
-        Colour options are defined below (e.g. “Primary 1”, “High impact”). If no colour is chosen,
-        boxes will be white.
-      </p>
+    <div class="buttons">
+      <button id="addNodeBtn">Add item</button>
+      <button id="clearAllBtn" class="danger">Clear all</button>
+    </div>
 
-      <div class="buttons">
-        <button id="addNodeBtn">Add item</button>
-        <button id="clearAllBtn" class="danger">Clear all</button>
-      </div>
+    <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;" />
+  </div>
 
-      <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;" />
+  <!-- Import / export -->
+  <h2 class="collapsible-header" data-target="sectionImportExport">
+    <span>2. Import / export</span>
+    <span class="collapsible-indicator">▾</span>
+  </h2>
+  <div id="sectionImportExport" class="collapsible-section">
+    <p class="small">
+      Use CSV to save your driver diagram and reload it later. The CSV includes the
+      colour associated with each box.
+    </p>
 
-      <h2>2. Import / export</h2>
-      <p class="small">
-        Use CSV to save your driver diagram and reload it later. The CSV includes the
-        colour associated with each box.
-      </p>
+    <div class="buttons">
+      <button id="downloadCsvBtn" class="secondary">Download CSV</button>
 
-      <div class="buttons">
-        <button id="downloadCsvBtn" class="secondary">Download CSV</button>
+      <label class="secondary nowrap" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 0.8rem;border-radius:4px;background:#e8edf5;color:#005eb8;cursor:pointer;">
+        <span>Upload CSV</span>
+        <input id="uploadCsvInput" type="file" accept=".csv" style="display:none;">
+      </label>
+    </div>
 
-        <label class="secondary nowrap" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 0.8rem;border-radius:4px;background:#e8edf5;color:#005eb8;cursor:pointer;">
-          <span>Upload CSV</span>
-          <input id="uploadCsvInput" type="file" accept=".csv" style="display:none;">
-        </label>
-      </div>
+    <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;" />
+  </div>
 
-      <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;" />
+  <!-- Colour options -->
+  <h2 class="collapsible-header" data-target="sectionColourOptions">
+    <span>3. Colour options</span>
+    <span class="collapsible-indicator">▾</span>
+  </h2>
+  <div id="sectionColourOptions" class="collapsible-section">
+    <p class="small">
+      Define optional colours you can apply to boxes. For example, you might use
+      different colours for related primary drivers or to highlight priority areas.
+      Click an existing colour in the list to edit it.
+    </p>
 
-      <h2>3. Colour options</h2>
-      <p class="small">
-        Define optional colours you can apply to boxes. For example, you might use
-        different colours for related primary drivers or to highlight priority areas.
-        Click an existing colour in the list to edit it.
-      </p>
+    <label for="colorLabelInput">Label for colour</label>
+    <input id="colorLabelInput" type="text" placeholder="e.g. Primary 1">
 
-      <label for="colorLabelInput">Label for colour</label>
-      <input id="colorLabelInput" type="text" placeholder="e.g. Primary 1">
+    <label for="colorValueInput">Colour value</label>
+    <input id="colorValueInput" type="color" value="#fff7cc">
 
-      <label for="colorValueInput">Colour value</label>
-      <input id="colorValueInput" type="color" value="#fff7cc">
+    <div class="buttons">
+      <button id="addColorBtn" class="secondary">Add / update colour option</button>
+    </div>
 
-      <div class="buttons">
-        <button id="addColorBtn" class="secondary">Add / update colour option</button>
-      </div>
+    <ul id="colorOptionsList" class="small" style="margin-top:0.5rem;padding-left:1rem;"></ul>
+  </div>
+</section>
 
-      <ul id="colorOptionsList" class="small" style="margin-top:0.5rem;padding-left:1rem;"></ul>
-    </section>
 
     <!-- Right column: diagram + legend + table -->
     <section class="card" id="diagramArea">

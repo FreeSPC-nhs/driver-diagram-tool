@@ -631,6 +631,24 @@ function renderNodesTable() {
   });
 }
 
+function setupCollapsibleSections() {
+  var headers = document.querySelectorAll(".collapsible-header");
+  headers.forEach(function (header) {
+    var targetId = header.dataset.target;
+    var section = targetId ? document.getElementById(targetId) : null;
+    var indicator = header.querySelector(".collapsible-indicator");
+    if (!section) return;
+
+    header.addEventListener("click", function () {
+      var collapsed = section.classList.toggle("is-collapsed");
+      if (indicator) {
+        indicator.textContent = collapsed ? "▸" : "▾";
+      }
+    });
+  });
+}
+
+
 function updateAllViews() {
   renderNodesTable();
   refreshParentOptions();
@@ -991,6 +1009,9 @@ document.addEventListener("DOMContentLoaded", function () {
   if (btnExportPdf) {
     btnExportPdf.addEventListener("click", exportDiagramPdf);
   }
+
+  // Set up collapsible sections in controls panel
+  setupCollapsibleSections();
 
   // Initial render
   updateAllViews();
