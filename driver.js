@@ -46,6 +46,109 @@ function getLevelLabel(level) {
   return level;
 }
 
+/* ---------- Diagram rendering (boxes + connecting lines) ---------- */
+
+function renderDiagram() {
+  var canvas = document.getElementById("diagramCanvas");
+  var columnsContainer = document.getElementById("diagramColumns");
+  var svg = document.getElementById("diagramConnections");
+  if (!canvas || !columnsContainer || !svg) return;
+
+  // Clear columns
+  columnsContainer.innerHTML = "";
+
+  var levels = ["aim", "primary", "secondary", "change"];
+  var levelTitles = {
+    aim: "Aim",
+    primary: "Primary drivers",
+    secondary: "Secondary drivers",
+    change: "Change ideas"
+  };
+
+  // Group nodes by level
+  var byLevel = {};
+  levels.forEach(function (level) {
+    byLevel[level] = nodes.filter(function (n) { return n.level === level; });
+  });
+
+  // Build columns
+  levels.forEach(function (level) {
+    var col = document.createElement("div");
+    col.className = "diagram-column";
+
+    var title = document.createElement("div");
+    title.className = "diagram-column-title";
+    title.textContent = levelTitles[level];
+    col.appendChild(title);
+
+    byLevel[level].forEach(function (node) {
+      var box = document.createElement("div");
+      box.className = "diagram-node level-" + level;
+      box.setAttribute("data-id", node.id);
+      box.textContent = node.text;
+      col.appendChild(box);
+    });
+
+    columnsContainer.appendChild(col);
+  });
+
+  // Draw connecting lines after layout has happened
+  if (!window.requestAnimationFrame) {
+    // Fallback if rAF not available
+    drawConnections(canvas, svg);
+  } else {
+    window.requestAnimationFrame(function () {
+      drawConnections(canvas, svg);
+    });
+  }
+}
+
+function drawConnections(canvas, svg) {
+  var canvasRect = canvas.getBoundingClientRect();
+
+  // Clear previous lines
+  while (svg.firstChild) {
+    svg.removeChild(svg.firstChild);
+  }
+
+  svg.setAttribute("width", canvasRect.width);
+  svg.setAttribute("height", canvasRect.height);
+
+  nodes.forEach(function (node) {
+    if (!node.parentId) return;
+
+    var parentEl = canvas.querySelector('.diagram-node[data-id="' + node.parentId + '"]');
+    var childEl = canvas.querySelector('.diagram-node[data-id="' + node.id + '"]');
+    if (!parentEl || !childEl) return;
+
+    var parentRect = parentEl.getBoundingClientRect();
+    var childRect = childEl.getBoundingClientRect();
+
+    var x1 = parentRect.right - canvasRect.left;
+    var y1 = parentRect.top + parentRect.height / 2 - canvasRect.top;
+    var x2 = childRect.left - canvasRect.left;
+    var y2 = childRect.top + childRect.height / 2 - canvasRect.top;
+
+    var midX = (x1 + x2) / 2;
+
+    var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    var d = "M " + x1 + " " + y1 +
+      " C " + midX + " " + y1 +
+      ", " + midX + " " + y2 +
+      ", " + x2 + " " + y2;
+
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#999");
+    path.setAttribute("stroke-width", "1.5");
+    path.setAttribute("stroke-linecap", "round");
+
+    svg.appendChild(path);
+  });
+}
+
+/* ---------- Form helpers & table ---------- */
+
 function refreshParentOptions() {
   var parentSelect = document.getElementById("nodeParent");
   if (!parentSelect) return;
@@ -133,6 +236,14 @@ function renderNodesTable() {
   });
 }
 
+function updateAllViews() {
+  renderNodesTable();
+  refreshParentOptions();
+  renderDiagram();
+}
+
+/* ---------- Actions ---------- */
+
 function addNodeFromForm() {
   var textEl = document.getElementById("nodeText");
   var levelEl = document.getElementById("nodeLevel");
@@ -153,16 +264,14 @@ function addNodeFromForm() {
   nodes.push(node);
 
   textEl.value = "";
-  renderNodesTable();
-  refreshParentOptions();
+  updateAllViews();
 }
 
 function clearAllNodes() {
   if (!window.confirm("Clear all items from this driver diagram?")) return;
   nodes = [];
   updateNextIdFromNodes();
-  renderNodesTable();
-  refreshParentOptions();
+  updateAllViews();
 }
 
 function deleteNode(id) {
@@ -189,9 +298,10 @@ function deleteNode(id) {
 
   nodes = nodes.filter(function (n) { return !toDelete.has(n.id); });
   updateNextIdFromNodes();
-  renderNodesTable();
-  refreshParentOptions();
+  updateAllViews();
 }
+
+/* ---------- CSV import / export ---------- */
 
 function downloadCsv() {
   if (nodes.length === 0) {
@@ -256,15 +366,16 @@ function uploadCsv(file) {
 
       nodes = imported;
       updateNextIdFromNodes();
-      renderNodesTable();
-      refreshParentOptions();
+      updateAllViews();
       alert("Loaded " + nodes.length + " items from CSV.");
     }
   });
 }
 
+/* ---------- Init ---------- */
+
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Driver Diagram Tool loaded (compat version).");
+  console.log("Driver Diagram Tool loaded with diagram.");
 
   var addBtn = document.getElementById("addNodeBtn");
   var clearBtn = document.getElementById("clearAllBtn");
@@ -284,6 +395,5 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  renderNodesTable();
-  refreshParentOptions();
+  updateAllViews();
 });
