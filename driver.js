@@ -359,12 +359,13 @@ function renderDiagram() {
       var prevLevel = getPreviousLevel(level);
       var nextLevel = getNextLevel(level);
 
-      if (prevLevel) {
+            if (prevLevel) {
         var leftBtn = document.createElement("button");
         leftBtn.type = "button";
         leftBtn.className = "diagram-add diagram-add-left";
-        leftBtn.textContent = "+";
+        leftBtn.textContent = "◀"; // parent
         leftBtn.title = "Add " + getLevelLabel(prevLevel) + " (parent)";
+        leftBtn.setAttribute("aria-label", "Add parent " + getLevelLabel(prevLevel));
         leftBtn.addEventListener("click", function (e) {
           e.stopPropagation();
           addParentForNode(node.id);
@@ -376,14 +377,16 @@ function renderDiagram() {
         var rightBtn = document.createElement("button");
         rightBtn.type = "button";
         rightBtn.className = "diagram-add diagram-add-right";
-        rightBtn.textContent = "+";
+        rightBtn.textContent = "▶"; // child
         rightBtn.title = "Add " + getLevelLabel(nextLevel) + " (child)";
+        rightBtn.setAttribute("aria-label", "Add child " + getLevelLabel(nextLevel));
         rightBtn.addEventListener("click", function (e) {
           e.stopPropagation();
           addChildForNode(node.id);
         });
         box.appendChild(rightBtn);
       }
+
 
       // Text content
       var textSpan = document.createElement("span");
@@ -403,11 +406,15 @@ function renderDiagram() {
       } else {
         badge.style.backgroundColor = "#ffffff";
       }
+      // Hint text / accessibility label
+      badge.title = "Click to change the colour of this box";
+      badge.setAttribute("aria-label", "Change colour");
       badge.addEventListener("click", function (e) {
         e.stopPropagation();
         cycleNodeColor(node);
       });
       box.appendChild(badge);
+
 
       col.appendChild(box);
     });
@@ -935,7 +942,12 @@ function exportDiagramPng() {
     return;
   }
 
+  // Hide badges during export
+  exportArea.classList.add("hide-badges");
+
   html2canvas(exportArea).then(function (canvas) {
+    exportArea.classList.remove("hide-badges");
+
     canvas.toBlob(function (blob) {
       if (!blob) return;
       var url = URL.createObjectURL(blob);
@@ -947,8 +959,12 @@ function exportDiagramPng() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     });
+  }).catch(function (err) {
+    exportArea.classList.remove("hide-badges");
+    console.error(err);
   });
 }
+
 
 function exportDiagramPdf() {
   var exportArea = document.getElementById("exportArea");
@@ -965,8 +981,17 @@ function exportDiagramPdf() {
     jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
   };
 
-  html2pdf().set(opt).from(exportArea).save();
+  // Hide badges during export
+  exportArea.classList.add("hide-badges");
+
+  html2pdf().set(opt).from(exportArea).save().then(function () {
+    exportArea.classList.remove("hide-badges");
+  }).catch(function (err) {
+    exportArea.classList.remove("hide-badges");
+    console.error(err);
+  });
 }
+
 
 /* ---------- Init ---------- */
 
