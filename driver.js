@@ -3,6 +3,7 @@
 
 var nodes = [];
 var nextId = 1;
+var connections = [];
 
 // Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
 var colorOptions = [];
@@ -62,6 +63,17 @@ function updateNextIdFromNodes() {
   });
   nextId = maxId + 1;
 }
+
+function rebuildConnectionsFromParents() {
+  // Use each node's parentId to reconstruct the baseline tree
+  connections = [];
+  nodes.forEach(function (n) {
+    if (n.parentId) {
+      connections.push({ fromId: n.parentId, toId: n.id });
+    }
+  });
+}
+
 
 function getLevelLabel(level) {
   if (level === "aim") return "Aim";
@@ -359,25 +371,50 @@ function renderDiagram() {
       var prevLevel = getPreviousLevel(level);
       var nextLevel = getNextLevel(level);
 
-            if (prevLevel) {
+	if (prevLevel) {
         var leftBtn = document.createElement("button");
         leftBtn.type = "button";
         leftBtn.className = "diagram-add diagram-add-left";
-        leftBtn.textContent = "◀"; // parent
-        leftBtn.title = "Add " + getLevelLabel(prevLevel) + " (parent)";
-        leftBtn.setAttribute("aria-label", "Add parent " + getLevelLabel(prevLevel));
+	// Match connector colour to node
+	if (node.color) {
+  	leftBtn.style.backgroundColor = node.color;
+  	leftBtn.style.borderColor = node.color;
+  	leftBtn.style.color = getContrastingTextColor(node.color); // keep symbol readable
+	} else {
+  	leftBtn.style.backgroundColor = "#ffffff";
+  	leftBtn.style.borderColor = "#d0d7de";
+  	leftBtn.style.color = "#555";
+	}
+        leftBtn.textContent = "📌"; 
+        leftBtn.title =
+          "Connect this item to an existing " + getLevelLabel(prevLevel);
+        leftBtn.setAttribute(
+          "aria-label",
+          "Connect to existing " + getLevelLabel(prevLevel)
+        );
         leftBtn.addEventListener("click", function (e) {
           e.stopPropagation();
-          addParentForNode(node.id);
+          addConnectionForNode(node.id);
         });
         box.appendChild(leftBtn);
       }
+
 
       if (nextLevel) {
         var rightBtn = document.createElement("button");
         rightBtn.type = "button";
         rightBtn.className = "diagram-add diagram-add-right";
-        rightBtn.textContent = "▶"; // child
+	// Match connector colour to node
+	if (node.color) {
+  	rightBtn.style.backgroundColor = node.color;
+  	rightBtn.style.borderColor = node.color;
+  	rightBtn.style.color = getContrastingTextColor(node.color);
+	} else {
+  	rightBtn.style.backgroundColor = "#ffffff";
+  	rightBtn.style.borderColor = "#d0d7de";
+  	rightBtn.style.color = "#555";
+	}
+        rightBtn.textContent = "+"; // child
         rightBtn.title = "Add " + getLevelLabel(nextLevel) + " (child)";
         rightBtn.setAttribute("aria-label", "Add child " + getLevelLabel(nextLevel));
         rightBtn.addEventListener("click", function (e) {
@@ -440,17 +477,15 @@ function drawConnections(canvas, svg) {
     svg.removeChild(svg.firstChild);
   }
 
-  svg.setAttribute("width", canvasRect.width);
+    svg.setAttribute("width", canvasRect.width);
   svg.setAttribute("height", canvasRect.height);
 
-  nodes.forEach(function (node) {
-    if (!node.parentId) return;
-
+  connections.forEach(function (conn) {
     var parentEl = canvas.querySelector(
-      '.diagram-node[data-id="' + node.parentId + '"]'
+      '.diagram-node[data-id="' + conn.fromId + '"]'
     );
     var childEl = canvas.querySelector(
-      '.diagram-node[data-id="' + node.id + '"]'
+      '.diagram-node[data-id="' + conn.toId + '"]'
     );
     if (!parentEl || !childEl) return;
 
@@ -491,6 +526,7 @@ function drawConnections(canvas, svg) {
 
     svg.appendChild(path);
   });
+
 }
 
 /* ---------- Form helpers & table ---------- */
@@ -685,7 +721,7 @@ function addNodeFromForm() {
     return;
   }
 
-  var node = createNode({
+    var node = createNode({
     level: level,
     text: text,
     parentId: parentId,
@@ -693,8 +729,14 @@ function addNodeFromForm() {
   });
   nodes.push(node);
 
+  // If a parent was chosen, add a connection for it
+  if (parentId) {
+    connections.push({ fromId: parentId, toId: node.id });
+  }
+
   textEl.value = "";
   updateAllViews();
+
 }
 
 /* ---------- Edit existing node ---------- */
@@ -722,7 +764,7 @@ function editNode(nodeId) {
 
 /* ---------- Actions from + buttons ---------- */
 
-function addParentForNode(nodeId) {
+function addConnectionForNode(nodeId) {
   var refNode = nodes.find(function (n) {
     return n.id === nodeId;
   });
@@ -730,30 +772,70 @@ function addParentForNode(nodeId) {
 
   var prevLevel = getPreviousLevel(refNode.level);
   if (!prevLevel) {
-    alert("This item is already at the highest level.");
+    alert("This item is already at the highest level and cannot have a parent.");
     return;
   }
 
-  var defaultPrompt =
-    "Enter text for new " + getLevelLabel(prevLevel) + " (parent)";
-  var text = window.prompt(defaultPrompt, "");
-  if (!text) return;
-
-  // New parent inherits old parent and colour (if any)
-  var newNode = createNode({
-    level: prevLevel,
-    text: text.trim(),
-    parentId: refNode.parentId,
-    color: refNode.color
+  // Candidates: nodes on the previous level
+  var candidates = nodes.filter(function (n) {
+    return n.level === prevLevel && n.id !== nodeId;
   });
 
-  nodes.push(newNode);
+  if (!candidates.length) {
+    alert("No " + getLevelLabel(prevLevel) + " items available to connect to yet.");
+    return;
+  }
 
-  // Reference node now points to the new parent
-  refNode.parentId = newNode.id;
+  var listText = candidates
+    .map(function (n) {
+      var shortText =
+        n.text.length > 40 ? n.text.slice(0, 37) + "…" : n.text;
+      return "[" + n.id + "] " + shortText;
+    })
+    .join("\n");
+
+  var defaultId = refNode.parentId || candidates[0].id;
+  var input = window.prompt(
+    "Enter the ID of the " +
+      getLevelLabel(prevLevel) +
+      " you want to connect to this item:\n\n" +
+      listText,
+    defaultId
+  );
+  if (input === null) return;
+  var parentId = input.trim();
+  if (!parentId) {
+    alert("No ID entered.");
+    return;
+  }
+
+  var parent = candidates.find(function (n) {
+    return n.id === parentId;
+  });
+  if (!parent) {
+    alert("No item found with ID " + parentId + ".");
+    return;
+  }
+
+  // Prevent duplicate link
+  var exists = connections.some(function (c) {
+    return c.fromId === parentId && c.toId === nodeId;
+  });
+  if (exists) {
+    alert("That connection already exists.");
+    return;
+  }
+
+  connections.push({ fromId: parentId, toId: nodeId });
+
+  // If this item does not yet have a primary parent, use this one
+  if (!refNode.parentId) {
+    refNode.parentId = parentId;
+  }
 
   updateAllViews();
 }
+
 
 function addChildForNode(nodeId) {
   var refNode = nodes.find(function (n) {
@@ -779,8 +861,13 @@ function addChildForNode(nodeId) {
     color: refNode.color // inherit colour
   });
 
-  nodes.push(newNode);
+    nodes.push(newNode);
+
+  // Record the connection parent -> child
+  connections.push({ fromId: refNode.id, toId: newNode.id });
+
   updateAllViews();
+
 }
 
 /* ---------- Clear / delete ---------- */
@@ -788,6 +875,7 @@ function addChildForNode(nodeId) {
 function clearAllNodes() {
   if (!window.confirm("Clear all items from this driver diagram?")) return;
   nodes = [];
+  connections = [];
   updateNextIdFromNodes();
   updateAllViews();
 }
@@ -814,11 +902,18 @@ function deleteNode(id) {
     return;
   }
 
-  nodes = nodes.filter(function (n) {
+    nodes = nodes.filter(function (n) {
     return !toDelete.has(n.id);
   });
+
+  // Remove any connections touching deleted nodes
+  connections = connections.filter(function (c) {
+    return !toDelete.has(c.fromId) && !toDelete.has(c.toId);
+  });
+
   updateNextIdFromNodes();
   updateAllViews();
+
 }
 
 /* ---------- CSV import / export ---------- */
@@ -892,6 +987,7 @@ function uploadCsv(file) {
       nodes = imported;
       updateNextIdFromNodes();
       rebuildColorOptionsFromNodes();
+      rebuildConnectionsFromParents();
       updateAllViews();
       alert("Loaded " + nodes.length + " items from CSV.");
     }
