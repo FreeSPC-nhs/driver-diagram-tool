@@ -4,6 +4,9 @@
 var nodes = [];
 var nextId = 1;
 
+// Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
+var colorOptions = [];
+
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
 
@@ -25,6 +28,7 @@ function createNode(options) {
   var level = options.level;
   var text = options.text;
   var parentId = options.parentId || "";
+  var color = options.color || "";
 
   if (id === undefined || id === null || id === "") {
     id = String(nextId++);
@@ -34,7 +38,8 @@ function createNode(options) {
     id: id,
     level: level,
     text: text,
-    parentId: parentId
+    parentId: parentId,
+    color: color
   };
 }
 
@@ -59,6 +64,106 @@ function getLevelLabel(level) {
   if (level === "secondary") return "Secondary driver";
   if (level === "change") return "Change idea";
   return level;
+}
+
+/* ---------- Colour helpers ---------- */
+
+function refreshColorSelect() {
+  var select = document.getElementById("nodeColor");
+  if (!select) return;
+
+  var currentValue = select.value;
+
+  select.innerHTML = "";
+  var noneOption = document.createElement("option");
+  noneOption.value = "";
+  noneOption.textContent = "No colour";
+  select.appendChild(noneOption);
+
+  colorOptions.forEach(function (opt) {
+    var option = document.createElement("option");
+    option.value = opt.value;
+    option.textContent = opt.label + " (" + opt.value + ")";
+    select.appendChild(option);
+  });
+
+  if (currentValue && (currentValue === "" || colorOptions.some(function (c) { return c.value === currentValue; }))) {
+    select.value = currentValue;
+  }
+}
+
+function renderColorOptionsList() {
+  var list = document.getElementById("colorOptionsList");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  if (colorOptions.length === 0) {
+    var li = document.createElement("li");
+    li.textContent = "No custom colours defined yet.";
+    list.appendChild(li);
+    return;
+  }
+
+  colorOptions.forEach(function (opt, index) {
+    var li = document.createElement("li");
+    li.textContent = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
+    list.appendChild(li);
+  });
+}
+
+function addColorOptionFromForm() {
+  var labelInput = document.getElementById("colorLabelInput");
+  var valueInput = document.getElementById("colorValueInput");
+  if (!labelInput || !valueInput) return;
+
+  var label = (labelInput.value || "").trim();
+  var value = (valueInput.value || "").trim();
+
+  if (!value) {
+    alert("Please choose a colour value.");
+    return;
+  }
+  if (!label) {
+    label = "Colour " + (colorOptions.length + 1);
+  }
+
+  // Check if this colour value already exists; if so, update label
+  var existing = colorOptions.find(function (c) { return c.value.toLowerCase() === value.toLowerCase(); });
+  if (existing) {
+    existing.label = label;
+  } else {
+    colorOptions.push({ label: label, value: value });
+  }
+
+  labelInput.value = "";
+  refreshColorSelect();
+  renderColorOptionsList();
+}
+
+// When importing CSV, we may see colour values that aren't in colourOptions yet.
+// Build default labels like "Colour 1", "Colour 2", ...
+function rebuildColorOptionsFromNodes() {
+  var seen = {};
+  nodes.forEach(function (n) {
+    if (n.color) {
+      seen[n.color] = true;
+    }
+  });
+
+  colorOptions = [];
+  var index = 1;
+  for (var value in seen) {
+    if (!seen.hasOwnProperty(value)) continue;
+    colorOptions.push({
+      label: "Colour " + index,
+      value: value
+    });
+    index++;
+  }
+
+  refreshColorSelect();
+  renderColorOptionsList();
 }
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
@@ -100,6 +205,12 @@ function renderDiagram() {
       var box = document.createElement("div");
       box.className = "diagram-node level-" + level;
       box.setAttribute("data-id", node.id);
+
+      // Apply colour fill if set
+      if (node.color) {
+        box.style.backgroundColor = node.color;
+        box.style.borderColor = "#999";
+      }
 
       // Add buttons for parent/child
       var prevLevel = getPreviousLevel(level);
@@ -194,8 +305,8 @@ function drawConnections(canvas, svg) {
 
     path.setAttribute("d", d);
     path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "#666");
-    path.setAttribute("stroke-width", "2.5");
+    path.setAttribute("stroke", "#666");      // darker line
+    path.setAttribute("stroke-width", "2.5"); // thicker line
     path.setAttribute("stroke-linecap", "round");
 
     svg.appendChild(path);
@@ -295,6 +406,8 @@ function updateAllViews() {
   renderNodesTable();
   refreshParentOptions();
   renderDiagram();
+  refreshColorSelect();
+  renderColorOptionsList();
 }
 
 /* ---------- Actions from the form ---------- */
@@ -303,19 +416,21 @@ function addNodeFromForm() {
   var textEl = document.getElementById("nodeText");
   var levelEl = document.getElementById("nodeLevel");
   var parentEl = document.getElementById("nodeParent");
+  var colorEl = document.getElementById("nodeColor");
 
   if (!textEl || !levelEl || !parentEl) return;
 
   var text = textEl.value.trim();
   var level = levelEl.value;
   var parentId = parentEl.value;
+  var color = colorEl ? colorEl.value : "";
 
   if (!text) {
     alert("Please enter some text for this item.");
     return;
   }
 
-  var node = createNode({ level: level, text: text, parentId: parentId });
+  var node = createNode({ level: level, text: text, parentId: parentId, color: color });
   nodes.push(node);
 
   textEl.value = "";
@@ -359,11 +474,12 @@ function addParentForNode(nodeId) {
   var text = window.prompt(defaultPrompt, "");
   if (!text) return;
 
-  // New parent inherits old parent (if any)
+  // New parent inherits old parent and colour (if any)
   var newNode = createNode({
     level: prevLevel,
     text: text.trim(),
-    parentId: refNode.parentId
+    parentId: refNode.parentId,
+    color: refNode.color
   });
 
   nodes.push(newNode);
@@ -391,7 +507,8 @@ function addChildForNode(nodeId) {
   var newNode = createNode({
     level: nextLevel,
     text: text.trim(),
-    parentId: refNode.id
+    parentId: refNode.id,
+    color: refNode.color // inherit colour
   });
 
   nodes.push(newNode);
@@ -447,7 +564,8 @@ function downloadCsv() {
       id: n.id,
       level: n.level,
       parent_id: n.parentId || "",
-      text: n.text
+      text: n.text,
+      color: n.color || ""
     };
   });
 
@@ -483,6 +601,7 @@ function uploadCsv(file) {
         var level = (row.level || "").toString().trim();
         var text = (row.text || "").toString().trim();
         var parentId = (row.parent_id || "").toString().trim();
+        var color = (row.color || "").toString().trim();
 
         if (!id || !level || !text) {
           console.warn("Skipping row " + (index + 1) + " - missing id/level/text.");
@@ -493,12 +612,14 @@ function uploadCsv(file) {
           id: id,
           level: level,
           text: text,
-          parentId: parentId
+          parentId: parentId,
+          color: color
         });
       });
 
       nodes = imported;
       updateNextIdFromNodes();
+      rebuildColorOptionsFromNodes();
       updateAllViews();
       alert("Loaded " + nodes.length + " items from CSV.");
     }
@@ -508,15 +629,18 @@ function uploadCsv(file) {
 /* ---------- Init ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Driver Diagram Tool loaded with clickable add & edit.");
+  console.log("Driver Diagram Tool loaded with colours.");
 
   var addBtn = document.getElementById("addNodeBtn");
   var clearBtn = document.getElementById("clearAllBtn");
   var downloadBtn = document.getElementById("downloadCsvBtn");
   var uploadInput = document.getElementById("uploadCsvInput");
+  var addColorBtn = document.getElementById("addColorBtn");
 
   if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
   if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
+  if (downloadBtn) addEventListener("click", downloadCsv);
+
   if (downloadBtn) downloadBtn.addEventListener("click", downloadCsv);
   if (uploadInput) {
     uploadInput.addEventListener("change", function (e) {
@@ -527,6 +651,12 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
+  if (addColorBtn) {
+    addColorBtn.addEventListener("click", function () {
+      addColorOptionFromForm();
+    });
+  }
 
+  // Initial render
   updateAllViews();
 });
