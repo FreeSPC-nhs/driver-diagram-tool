@@ -134,6 +134,11 @@ function renderDiagram() {
       // Text content in a span so it doesn't interfere with buttons
       var textSpan = document.createElement("span");
       textSpan.textContent = node.text;
+      textSpan.title = "Click to edit text";
+      textSpan.addEventListener("click", function (e) {
+        e.stopPropagation();
+        editNode(node.id);
+      });
       box.appendChild(textSpan);
 
       col.appendChild(box);
@@ -317,6 +322,27 @@ function addNodeFromForm() {
   updateAllViews();
 }
 
+/* ---------- Edit existing node ---------- */
+
+function editNode(nodeId) {
+  var node = nodes.find(function (n) { return n.id === nodeId; });
+  if (!node) return;
+
+  var newText = window.prompt("Edit text for this item:", node.text);
+  if (newText === null) {
+    // user pressed Cancel
+    return;
+  }
+  newText = newText.trim();
+  if (!newText) {
+    alert("Text cannot be empty.");
+    return;
+  }
+
+  node.text = newText;
+  updateAllViews();
+}
+
 /* ---------- Actions from + buttons ---------- */
 
 function addParentForNode(nodeId) {
@@ -482,7 +508,7 @@ function uploadCsv(file) {
 /* ---------- Init ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Driver Diagram Tool loaded with clickable add buttons.");
+  console.log("Driver Diagram Tool loaded with clickable add & edit.");
 
   var addBtn = document.getElementById("addNodeBtn");
   var clearBtn = document.getElementById("clearAllBtn");
