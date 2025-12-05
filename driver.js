@@ -166,6 +166,28 @@ function rebuildColorOptionsFromNodes() {
   renderColorOptionsList();
 }
 
+function cycleNodeColor(node) {
+  if (!colorOptions.length) {
+    alert("No colour options defined yet. Add some colours on the left first.");
+    return;
+  }
+
+  // Order: no colour (""), then each configured colour value
+  var palette = [""].concat(colorOptions.map(function (c) { return c.value; }));
+
+  var current = node.color || "";
+  var currentIndex = palette.indexOf(current);
+  if (currentIndex === -1) {
+    currentIndex = 0;
+  }
+
+  var nextIndex = (currentIndex + 1) % palette.length;
+  node.color = palette[nextIndex];
+
+  updateAllViews();
+}
+
+
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
 
 function renderDiagram() {
@@ -251,6 +273,20 @@ function renderDiagram() {
         editNode(node.id);
       });
       box.appendChild(textSpan);
+
+    // Little colour badge that cycles through colours on click
+    var badge = document.createElement("div");
+    badge.className = "diagram-color-badge";
+    if (node.color) {
+      badge.style.backgroundColor = node.color;
+    } else {
+      badge.style.backgroundColor = "#ffffff";
+    }
+    badge.addEventListener("click", function (e) {
+      e.stopPropagation();
+      cycleNodeColor(node);
+    });
+    box.appendChild(badge);
 
       col.appendChild(box);
     });
