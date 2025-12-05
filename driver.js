@@ -639,8 +639,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
   if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
-  if (downloadBtn) addEventListener("click", downloadCsv);
-
   if (downloadBtn) downloadBtn.addEventListener("click", downloadCsv);
   if (uploadInput) {
     uploadInput.addEventListener("change", function (e) {
