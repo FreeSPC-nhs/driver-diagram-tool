@@ -140,6 +140,38 @@ function renderColorOptionsList() {
   });
 }
 
+function renderLegend() {
+  var list = document.getElementById("legendList");
+  var emptyMsg = document.getElementById("legendEmptyMessage");
+  if (!list || !emptyMsg) return;
+
+  list.innerHTML = "";
+
+  if (!colorOptions.length) {
+    emptyMsg.style.display = "block";
+    return;
+  }
+
+  emptyMsg.style.display = "none";
+
+  colorOptions.forEach(function (opt, index) {
+    var li = document.createElement("li");
+    li.className = "legend-item";
+
+    var swatch = document.createElement("span");
+    swatch.className = "legend-color-swatch";
+    swatch.style.backgroundColor = opt.value;
+
+    var labelSpan = document.createElement("span");
+    labelSpan.textContent = opt.label + " (" + opt.value + ")";
+
+    li.appendChild(swatch);
+    li.appendChild(labelSpan);
+    list.appendChild(li);
+  });
+}
+
+
 function addColorOptionFromForm() {
   var labelInput = document.getElementById("colorLabelInput");
   var valueInput = document.getElementById("colorValueInput");
@@ -597,6 +629,7 @@ function updateAllViews() {
   renderDiagram();
   refreshColorSelect();
   renderColorOptionsList();
+  renderLegend();
 }
 
 /* ---------- Actions from the form ---------- */

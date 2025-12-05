@@ -198,6 +198,34 @@
       cursor: pointer;
     }
 
+    /* Legend styles */
+    #legend {
+      margin-top: 0.5rem;
+    }
+    .legend-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+    }
+    #legendList {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      margin-bottom: 0.15rem;
+    }
+    .legend-color-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid #666;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
+    }
 
 
     table {
@@ -327,6 +355,16 @@
           <div id="diagramColumns"></div>
         </div>
       </div>
+
+   <!-- Legend -->
+      <div id="legend">
+        <p class="legend-title">Legend</p>
+        <p class="small" id="legendEmptyMessage">
+          No colours defined yet. Add colours on the left to see them listed here.
+        </p>
+        <ul id="legendList"></ul>
+      </div>
+
 
       <h3 style="margin-top: 0.75rem;">Table view</h3>
       <p class="small" id="noItemsMessage">
