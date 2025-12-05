@@ -883,6 +883,13 @@ function toggleControlsVisibility() {
   controlsVisible = !controlsVisible;
   panel.style.display = controlsVisible ? "" : "none";
   btn.textContent = controlsVisible ? "Hide controls" : "Show controls";
+
+  // Recalculate node positions and redraw connection lines after layout change
+  if (window.requestAnimationFrame) {
+    window.requestAnimationFrame(updateAllViews);
+  } else {
+    updateAllViews();
+  }
 }
 
 function toggleTableVisibility() {
