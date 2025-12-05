@@ -896,11 +896,20 @@ function uploadCsv(file) {
 function toggleControlsVisibility() {
   var panel = document.getElementById("controlsPanel");
   var btn = document.getElementById("btnToggleControls");
-  if (!panel || !btn) return;
+  var layout = document.querySelector("main"); // the 2-column grid
+  if (!panel || !btn || !layout) return;
 
   controlsVisible = !controlsVisible;
   panel.style.display = controlsVisible ? "" : "none";
   btn.textContent = controlsVisible ? "Hide controls" : "Show controls";
+
+  // When controls are hidden, make the diagram take full width;
+  // when shown, revert to the original 2-column layout.
+  if (controlsVisible) {
+    layout.style.gridTemplateColumns = ""; // fall back to CSS (two columns)
+  } else {
+    layout.style.gridTemplateColumns = "minmax(0, 1fr)"; // single column
+  }
 
   // Recalculate node positions and redraw connection lines after layout change
   if (window.requestAnimationFrame) {
