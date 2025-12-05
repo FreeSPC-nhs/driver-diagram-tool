@@ -1,15 +1,25 @@
 // driver.js
 // Core logic for the Driver Diagram Tool
 
-let nodes = [];
-let nextId = 1;
+var nodes = [];
+var nextId = 1;
 
-function createNode({ id, level, text, parentId }) {
+function createNode(options) {
+  options = options || {};
+  var id = options.id;
+  var level = options.level;
+  var text = options.text;
+  var parentId = options.parentId || "";
+
+  if (id === undefined || id === null || id === "") {
+    id = String(nextId++);
+  }
+
   return {
-    id: id ?? String(nextId++),
-    level,
-    text,
-    parentId: parentId || ""
+    id: id,
+    level: level,
+    text: text,
+    parentId: parentId
   };
 }
 
@@ -18,61 +28,55 @@ function updateNextIdFromNodes() {
     nextId = 1;
     return;
   }
-  const maxId = nodes.reduce((max, n) => {
-    const numeric = parseInt(n.id, 10);
-    return Number.isNaN(numeric) ? max : Math.max(max, numeric);
-  }, 0);
+  var maxId = 0;
+  nodes.forEach(function (n) {
+    var numeric = parseInt(n.id, 10);
+    if (!isNaN(numeric) && numeric > maxId) {
+      maxId = numeric;
+    }
+  });
   nextId = maxId + 1;
 }
 
 function getLevelLabel(level) {
-  switch (level) {
-    case "aim":
-      return "Aim";
-    case "primary":
-      return "Primary";
-    case "secondary":
-      return "Secondary";
-    case "change":
-      return "Change idea";
-    default:
-      return level;
-  }
+  if (level === "aim") return "Aim";
+  if (level === "primary") return "Primary";
+  if (level === "secondary") return "Secondary driver";
+  if (level === "change") return "Change idea";
+  return level;
 }
 
 function refreshParentOptions() {
-  const parentSelect = document.getElementById("nodeParent");
+  var parentSelect = document.getElementById("nodeParent");
   if (!parentSelect) return;
 
-  const currentValue = parentSelect.value;
+  var currentValue = parentSelect.value;
 
-  // Reset options
   parentSelect.innerHTML = "";
-  const noneOption = document.createElement("option");
+  var noneOption = document.createElement("option");
   noneOption.value = "";
   noneOption.textContent = "— None / top level —";
   parentSelect.appendChild(noneOption);
 
-  nodes.forEach((node) => {
-    const opt = document.createElement("option");
+  nodes.forEach(function (node) {
+    var opt = document.createElement("option");
     opt.value = node.id;
-    const shortText = node.text.length > 50
-      ? node.text.slice(0, 47) + "…"
-      : node.text;
-    opt.textContent = `[${node.id}] ${getLevelLabel(node.level)} – ${shortText}`;
+    var shortText =
+      node.text.length > 50 ? node.text.slice(0, 47) + "…" : node.text;
+    opt.textContent =
+      "[" + node.id + "] " + getLevelLabel(node.level) + " – " + shortText;
     parentSelect.appendChild(opt);
   });
 
-  // Try to preserve previous selection if still valid
-  if (currentValue && nodes.some((n) => n.id === currentValue)) {
+  if (currentValue && nodes.some(function (n) { return n.id === currentValue; })) {
     parentSelect.value = currentValue;
   }
 }
 
 function renderNodesTable() {
-  const tableWrapper = document.getElementById("nodesTableWrapper");
-  const tbody = document.getElementById("nodesTableBody");
-  const noItemsMessage = document.getElementById("noItemsMessage");
+  var tableWrapper = document.getElementById("nodesTableWrapper");
+  var tbody = document.getElementById("nodesTableBody");
+  var noItemsMessage = document.getElementById("noItemsMessage");
 
   if (!tableWrapper || !tbody || !noItemsMessage) return;
 
@@ -87,42 +91,199 @@ function renderNodesTable() {
   tableWrapper.style.display = "block";
   noItemsMessage.style.display = "none";
 
-  nodes.forEach((node) => {
-    const tr = document.createElement("tr");
+  nodes.forEach(function (node) {
+    var tr = document.createElement("tr");
 
-    const tdId = document.createElement("td");
+    var tdId = document.createElement("td");
     tdId.textContent = node.id;
     tr.appendChild(tdId);
 
-    const tdLevel = document.createElement("td");
+    var tdLevel = document.createElement("td");
     tdLevel.textContent = getLevelLabel(node.level);
     tr.appendChild(tdLevel);
 
-    const tdParent = document.createElement("td");
+    var tdParent = document.createElement("td");
     if (node.parentId) {
-      const parent = nodes.find((n) => n.id === node.parentId);
+      var parent = nodes.find(function (n) { return n.id === node.parentId; });
       tdParent.textContent = parent
-        ? `[${parent.id}] ${getLevelLabel(parent.level)}`
-        : `(Missing: ${node.parentId})`;
+        ? "[" + parent.id + "] " + getLevelLabel(parent.level)
+        : "(Missing: " + node.parentId + ")";
     } else {
       tdParent.textContent = "—";
     }
     tr.appendChild(tdParent);
 
-    const tdText = document.createElement("td");
+    var tdText = document.createElement("td");
     tdText.textContent = node.text;
     tr.appendChild(tdText);
 
-    const tdActions = document.createElement("td");
-    const delBtn = document.createElement("button");
+    var tdActions = document.createElement("td");
+    var delBtn = document.createElement("button");
     delBtn.textContent = "Delete";
     delBtn.className = "danger";
     delBtn.style.padding = "0.25rem 0.5rem";
     delBtn.style.fontSize = "0.8rem";
-    delBtn.addEventListener("click", () => {
+    delBtn.addEventListener("click", function () {
       deleteNode(node.id);
     });
     tdActions.appendChild(delBtn);
     tr.appendChild(tdActions);
 
-    tbody.append
+    tbody.appendChild(tr);
+  });
+}
+
+function addNodeFromForm() {
+  var textEl = document.getElementById("nodeText");
+  var levelEl = document.getElementById("nodeLevel");
+  var parentEl = document.getElementById("nodeParent");
+
+  if (!textEl || !levelEl || !parentEl) return;
+
+  var text = textEl.value.trim();
+  var level = levelEl.value;
+  var parentId = parentEl.value;
+
+  if (!text) {
+    alert("Please enter some text for this item.");
+    return;
+  }
+
+  var node = createNode({ level: level, text: text, parentId: parentId });
+  nodes.push(node);
+
+  textEl.value = "";
+  renderNodesTable();
+  refreshParentOptions();
+}
+
+function clearAllNodes() {
+  if (!window.confirm("Clear all items from this driver diagram?")) return;
+  nodes = [];
+  updateNextIdFromNodes();
+  renderNodesTable();
+  refreshParentOptions();
+}
+
+function deleteNode(id) {
+  var toDelete = new Set([id]);
+  var changed = true;
+
+  while (changed) {
+    changed = false;
+    nodes.forEach(function (n) {
+      if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+        toDelete.add(n.id);
+        changed = true;
+      }
+    });
+  }
+
+  if (
+    !window.confirm(
+      "Delete this item and " + (toDelete.size - 1) + " dependent item(s)?"
+    )
+  ) {
+    return;
+  }
+
+  nodes = nodes.filter(function (n) { return !toDelete.has(n.id); });
+  updateNextIdFromNodes();
+  renderNodesTable();
+  refreshParentOptions();
+}
+
+function downloadCsv() {
+  if (nodes.length === 0) {
+    alert("No items to export yet.");
+    return;
+  }
+
+  var dataForCsv = nodes.map(function (n) {
+    return {
+      id: n.id,
+      level: n.level,
+      parent_id: n.parentId || "",
+      text: n.text
+    };
+  });
+
+  var csv = Papa.unparse(dataForCsv);
+  var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  var url = URL.createObjectURL(blob);
+
+  var link = document.createElement("a");
+  link.href = url;
+  link.download = "driver-diagram.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function uploadCsv(file) {
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function (results) {
+      if (results.errors && results.errors.length > 0) {
+        console.error("CSV parse errors", results.errors);
+      }
+
+      var rows = results.data;
+      var imported = [];
+
+      rows.forEach(function (row, index) {
+        var id = (row.id || "").toString().trim();
+        var level = (row.level || "").toString().trim();
+        var text = (row.text || "").toString().trim();
+        var parentId = (row.parent_id || "").toString().trim();
+
+        if (!id || !level || !text) {
+          console.warn("Skipping row " + (index + 1) + " - missing id/level/text.");
+          return;
+        }
+
+        imported.push({
+          id: id,
+          level: level,
+          text: text,
+          parentId: parentId
+        });
+      });
+
+      nodes = imported;
+      updateNextIdFromNodes();
+      renderNodesTable();
+      refreshParentOptions();
+      alert("Loaded " + nodes.length + " items from CSV.");
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  console.log("Driver Diagram Tool loaded (compat version).");
+
+  var addBtn = document.getElementById("addNodeBtn");
+  var clearBtn = document.getElementById("clearAllBtn");
+  var downloadBtn = document.getElementById("downloadCsvBtn");
+  var uploadInput = document.getElementById("uploadCsvInput");
+
+  if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
+  if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
+  if (downloadBtn) downloadBtn.addEventListener("click", downloadCsv);
+  if (uploadInput) {
+    uploadInput.addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (file) {
+        uploadCsv(file);
+        e.target.value = "";
+      }
+    });
+  }
+
+  renderNodesTable();
+  refreshParentOptions();
+});
