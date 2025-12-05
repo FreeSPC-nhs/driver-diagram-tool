@@ -463,6 +463,38 @@
 
     <ul id="colorOptionsList" class="small" style="margin-top:0.5rem;padding-left:1rem;"></ul>
   </div>
+
+<!-- Diagram appearance -->
+  <h2 class="collapsible-header" data-target="sectionAppearance">
+    <span>4. Diagram appearance</span>
+    <span class="collapsible-indicator">▾</span>
+  </h2>
+  <div id="sectionAppearance" class="collapsible-section">
+    <p class="small">
+      Adjust the size, spacing and text styling of the boxes in the diagram. These
+      settings do not change the data, only how it looks.
+    </p>
+
+    <label for="boxHeightInput">Box height (px)</label>
+    <input id="boxHeightInput" type="number" min="20" max="200" value="32">
+
+    <label for="boxGapInput">Vertical gap between boxes (px)</label>
+    <input id="boxGapInput" type="number" min="0" max="200" value="8">
+
+    <label for="boxFontSizeInput">Text size (px)</label>
+    <input id="boxFontSizeInput" type="number" min="8" max="32" value="13">
+
+    <label for="boxFontFamilyInput">Font family (optional)</label>
+    <input
+      id="boxFontFamilyInput"
+      type="text"
+      placeholder='e.g. "Segoe UI", Arial, sans-serif'
+    >
+
+    <div class="buttons">
+      <button id="applyAppearanceBtn" class="secondary">Apply appearance</button>
+    </div>
+  </div>
 </section>
 
 

@@ -5,6 +5,15 @@ var nodes = [];
 var nextId = 1;
 var connections = [];
 
+// Diagram appearance settings (defaults)
+var diagramAppearance = {
+  boxHeight: 32,      // px
+  verticalGap: 8,     // px between boxes
+  fontSize: 13,       // px
+  fontFamily: ""      // empty = inherit from page
+};
+
+
 // Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
 var colorOptions = [];
 var editingColorIndex = -1; // which colour option is being edited (if any)
@@ -363,6 +372,18 @@ function renderDiagram() {
       box.className = "diagram-node level-" + level;
       box.setAttribute("data-id", node.id);
 
+	// Apply appearance settings
+    if (diagramAppearance) {
+      box.style.minHeight = diagramAppearance.boxHeight + "px";
+      box.style.marginBottom = diagramAppearance.verticalGap + "px";
+      box.style.fontSize = diagramAppearance.fontSize + "px";
+      if (diagramAppearance.fontFamily) {
+        box.style.fontFamily = diagramAppearance.fontFamily;
+      } else {
+        box.style.fontFamily = ""; // inherit
+      }
+    }
+
       // Apply colour fill if set
       if (node.color) {
         box.style.backgroundColor = node.color;
@@ -697,6 +718,31 @@ function setupCollapsibleSections() {
       }
     });
   });
+}
+
+function applyDiagramAppearanceFromInputs() {
+  var hInput = document.getElementById("boxHeightInput");
+  var gInput = document.getElementById("boxGapInput");
+  var fsInput = document.getElementById("boxFontSizeInput");
+  var ffInput = document.getElementById("boxFontFamilyInput");
+
+  if (!hInput || !gInput || !fsInput || !ffInput) return;
+
+  var h = parseInt(hInput.value, 10);
+  var g = parseInt(gInput.value, 10);
+  var fs = parseInt(fsInput.value, 10);
+  var ff = ffInput.value.trim();
+
+  if (!isFinite(h) || h <= 0) h = 32;
+  if (!isFinite(g) || g < 0) g = 8;
+  if (!isFinite(fs) || fs <= 0) fs = 13;
+
+  diagramAppearance.boxHeight = h;
+  diagramAppearance.verticalGap = g;
+  diagramAppearance.fontSize = fs;
+  diagramAppearance.fontFamily = ff;
+
+  updateAllViews();
 }
 
 
@@ -1204,6 +1250,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Set up collapsible sections in controls panel
   setupCollapsibleSections();
+ 
+// Initial render (using default appearance)
+  applyDiagramAppearanceFromInputs();
 
   // Initial render
   updateAllViews();
