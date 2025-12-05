@@ -11,6 +11,7 @@ var diagramAppearance = {
   verticalGap: 8,     // px between boxes
   fontSize: 13,       // px
   fontFamily: ""      // empty = inherit from page
+  fontBold: false
 };
 
 
@@ -366,6 +367,10 @@ function renderDiagram() {
     var stack = document.createElement("div");
     stack.className = "diagram-column-stack";
     col.appendChild(stack);
+    
+    if (level === "aim" && byLevel[level].length === 1) {
+      stack.style.justifyContent = "center";
+    }
 
     byLevel[level].forEach(function (node) {
       var box = document.createElement("div");
@@ -382,6 +387,7 @@ function renderDiagram() {
       } else {
         box.style.fontFamily = ""; // inherit
       }
+      box.style.fontWeight = diagramAppearance.fontBold ? "700" : "400"; 
     }
 
       // Apply colour fill if set
@@ -399,10 +405,17 @@ function renderDiagram() {
       var prevLevel = getPreviousLevel(level);
       var nextLevel = getNextLevel(level);
 
-	if (prevLevel) {
+	if (prevLevel && level !== "primary") {
         var leftBtn = document.createElement("button");
         leftBtn.type = "button";
         leftBtn.className = "diagram-add diagram-add-left";
+	// Size the connector to match box height
+        if (diagramAppearance && diagramAppearance.boxHeight) {
+          var h = diagramAppearance.boxHeight;
+          leftBtn.style.height = h + "px";
+          leftBtn.style.width = h + "px";
+          leftBtn.style.borderRadius = (h / 2) + "px";
+        }	
 	// Match connector colour to node
 	if (node.color) {
   	leftBtn.style.backgroundColor = node.color;
@@ -432,6 +445,13 @@ function renderDiagram() {
         var rightBtn = document.createElement("button");
         rightBtn.type = "button";
         rightBtn.className = "diagram-add diagram-add-right";
+	// Size the connector to match box height
+        if (diagramAppearance && diagramAppearance.boxHeight) {
+          var h2 = diagramAppearance.boxHeight;
+          rightBtn.style.height = h2 + "px";
+          rightBtn.style.width = h2 + "px";
+          rightBtn.style.borderRadius = (h2 / 2) + "px";
+        }	
 	// Match connector colour to node
 	if (node.color) {
   	rightBtn.style.backgroundColor = node.color;
@@ -725,6 +745,7 @@ function applyDiagramAppearanceFromInputs() {
   var gInput = document.getElementById("boxGapInput");
   var fsInput = document.getElementById("boxFontSizeInput");
   var ffInput = document.getElementById("boxFontFamilyInput");
+  var boldInput = document.getElementById("boxFontBoldInput");
 
   if (!hInput || !gInput || !fsInput || !ffInput) return;
 
@@ -732,6 +753,7 @@ function applyDiagramAppearanceFromInputs() {
   var g = parseInt(gInput.value, 10);
   var fs = parseInt(fsInput.value, 10);
   var ff = ffInput.value.trim();
+  var bold = !!(boldInput && boldInput.checked);
 
   if (!isFinite(h) || h <= 0) h = 32;
   if (!isFinite(g) || g < 0) g = 8;
@@ -741,6 +763,7 @@ function applyDiagramAppearanceFromInputs() {
   diagramAppearance.verticalGap = g;
   diagramAppearance.fontSize = fs;
   diagramAppearance.fontFamily = ff;
+  diagramAppearance.fontBold = bold; 
 
   updateAllViews();
 }
@@ -1213,6 +1236,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnHeaderClear = document.getElementById("btnHeaderClear");
   var btnExportPng = document.getElementById("btnExportPng");
   var btnExportPdf = document.getElementById("btnExportPdf");
+  var applyAppearanceBtn = document.getElementById("applyAppearanceBtn");
 
   if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
   if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
@@ -1247,6 +1271,9 @@ document.addEventListener("DOMContentLoaded", function () {
   if (btnExportPdf) {
     btnExportPdf.addEventListener("click", exportDiagramPdf);
   }
+  if (applyAppearanceBtn) {
+    applyAppearanceBtn.addEventListener("click", applyDiagramAppearanceFromInputs);
+  }
 
   // Set up collapsible sections in controls panel
   setupCollapsibleSections();
@@ -1254,6 +1281,4 @@ document.addEventListener("DOMContentLoaded", function () {
 // Initial render (using default appearance)
   applyDiagramAppearanceFromInputs();
 
-  // Initial render
-  updateAllViews();
 });

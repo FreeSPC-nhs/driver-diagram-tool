@@ -170,7 +170,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      justify-content: space-evenly; /* spread nodes down the column */
+      justify-content: flex-start; /* let JS + margins control spacing */
     }
 
     /* For the Aim column, centre its single node vertically */
@@ -235,9 +235,10 @@
     .diagram-add-right {
       right: -10px;
     }
-    .diagram-color-badge {
+     .diagram-color-badge {
       position: absolute;
-      bottom: 3px;
+      top: 50%;
+      transform: translateY(-50%);
       right: 15px;
       width: 14px;
       height: 14px;
@@ -247,6 +248,7 @@
       box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
       cursor: pointer;
     }
+
 
     /* Hide colour badges when exporting */
     .hide-badges .diagram-color-badge {
@@ -490,6 +492,11 @@
       type="text"
       placeholder='e.g. "Segoe UI", Arial, sans-serif'
     >
+	
+     <label for="boxFontBoldInput" style="display:flex;align-items:center;gap:0.4rem;margin-top:0.25rem;">
+      <input id="boxFontBoldInput" type="checkbox">
+      <span>Bold text</span>
+    </label>
 
     <div class="buttons">
       <button id="applyAppearanceBtn" class="secondary">Apply appearance</button>
