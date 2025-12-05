@@ -924,15 +924,30 @@ function downloadCsv() {
     return;
   }
 
-  var dataForCsv = nodes.map(function (n) {
+    var dataForCsv = nodes.map(function (n) {
+    // all parents for this node according to connections
+    var parentLinks = connections
+      .filter(function (c) { return c.toId === n.id; })
+      .map(function (c) { return c.fromId; });
+
+    // main parent stays in parent_id column
+    var mainParentId = n.parentId || "";
+
+    // extra parents are any other connected parents
+    var extraParents = parentLinks.filter(function (pid) {
+      return pid && pid !== mainParentId;
+    });
+
     return {
       id: n.id,
       level: n.level,
-      parent_id: n.parentId || "",
+      parent_id: mainParentId,
       text: n.text,
-      color: n.color || ""
+      color: n.color || "",
+      extra_parents: extraParents.join(";")
     };
   });
+
 
   var csv = Papa.unparse(dataForCsv);
   var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -961,12 +976,18 @@ function uploadCsv(file) {
       var rows = results.data;
       var imported = [];
 
+            var extraConnectionsRaw = []; // temp storage: { childId, parents[] }
+
       rows.forEach(function (row, index) {
         var id = (row.id || "").toString().trim();
         var level = (row.level || "").toString().trim();
         var text = (row.text || "").toString().trim();
         var parentId = (row.parent_id || "").toString().trim();
         var color = (row.color || "").toString().trim();
+
+        // new column (may be missing in older CSVs)
+        var extraParentsField =
+          (row.extra_parents || "").toString().trim();
 
         if (!id || !level || !text) {
           console.warn(
@@ -982,12 +1003,45 @@ function uploadCsv(file) {
           parentId: parentId,
           color: color
         });
+
+        // Parse extra parents into an array of IDs
+        if (extraParentsField) {
+          var parents = extraParentsField
+            .split(/[;,]/)
+            .map(function (s) { return s.trim(); })
+            .filter(Boolean);
+
+          if (parents.length) {
+            extraConnectionsRaw.push({ childId: id, parents: parents });
+          }
+        }
       });
+
 
       nodes = imported;
       updateNextIdFromNodes();
       rebuildColorOptionsFromNodes();
+            // First, rebuild baseline connections from primary parent_id
       rebuildConnectionsFromParents();
+
+      // Then add extra connections from extra_parents
+      extraConnectionsRaw.forEach(function (entry) {
+        var childId = entry.childId;
+        entry.parents.forEach(function (pid) {
+          // only add if both ends exist and it's not already present
+          var parentExists = nodes.some(function (n) { return n.id === pid; });
+          var childExists = nodes.some(function (n) { return n.id === childId; });
+          if (!parentExists || !childExists) return;
+
+          var already = connections.some(function (c) {
+            return c.fromId === pid && c.toId === childId;
+          });
+          if (!already) {
+            connections.push({ fromId: pid, toId: childId });
+          }
+        });
+      });
+
       updateAllViews();
       alert("Loaded " + nodes.length + " items from CSV.");
     }
