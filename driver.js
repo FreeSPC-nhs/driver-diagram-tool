@@ -8,6 +8,10 @@ var nextId = 1;
 var colorOptions = [];
 var editingColorIndex = -1; // which colour option is being edited (if any)
 
+// View state
+var controlsVisible = true;
+var tableVisible = true;
+
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
 
@@ -140,38 +144,6 @@ function renderColorOptionsList() {
   });
 }
 
-function renderLegend() {
-  var list = document.getElementById("legendList");
-  var emptyMsg = document.getElementById("legendEmptyMessage");
-  if (!list || !emptyMsg) return;
-
-  list.innerHTML = "";
-
-  if (!colorOptions.length) {
-    emptyMsg.style.display = "block";
-    return;
-  }
-
-  emptyMsg.style.display = "none";
-
-  colorOptions.forEach(function (opt, index) {
-    var li = document.createElement("li");
-    li.className = "legend-item";
-
-    var swatch = document.createElement("span");
-    swatch.className = "legend-color-swatch";
-    swatch.style.backgroundColor = opt.value;
-
-    var labelSpan = document.createElement("span");
-    labelSpan.textContent = opt.label + " (" + opt.value + ")";
-
-    li.appendChild(swatch);
-    li.appendChild(labelSpan);
-    list.appendChild(li);
-  });
-}
-
-
 function addColorOptionFromForm() {
   var labelInput = document.getElementById("colorLabelInput");
   var valueInput = document.getElementById("colorValueInput");
@@ -215,12 +187,12 @@ function addColorOptionFromForm() {
   }
 
   labelInput.value = "";
-  // keep the last chosen colour in the colour picker for convenience
+  // keep the last chosen colour in the colour picker
 
   updateAllViews();
 }
 
-// When importing CSV, we may see colour values that aren't in colourOptions yet.
+// When importing CSV, we may see colour values that aren't in colorOptions yet.
 // Build default labels like "Colour 1", "Colour 2", ...
 function rebuildColorOptionsFromNodes() {
   var seen = {};
@@ -267,10 +239,8 @@ function getContrastingTextColor(hex) {
   var rgb = hexToRgb(hex);
   if (!rgb) return "#000000";
 
-  // perceived brightness: https://www.w3.org/TR/AERT/#color-contrast
+  // perceived brightness
   var brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-
-  // threshold around mid-grey
   return brightness > 130 ? "#000000" : "#ffffff";
 }
 
@@ -297,6 +267,39 @@ function cycleNodeColor(node) {
   node.color = palette[nextIndex];
 
   updateAllViews();
+}
+
+/* ---------- Legend ---------- */
+
+function renderLegend() {
+  var list = document.getElementById("legendList");
+  var emptyMsg = document.getElementById("legendEmptyMessage");
+  if (!list || !emptyMsg) return;
+
+  list.innerHTML = "";
+
+  if (!colorOptions.length) {
+    emptyMsg.style.display = "block";
+    return;
+  }
+
+  emptyMsg.style.display = "none";
+
+  colorOptions.forEach(function (opt) {
+    var li = document.createElement("li");
+    li.className = "legend-item";
+
+    var swatch = document.createElement("span");
+    swatch.className = "legend-color-swatch";
+    swatch.style.backgroundColor = opt.value;
+
+    var labelSpan = document.createElement("span");
+    labelSpan.textContent = opt.label + " (" + opt.value + ")";
+
+    li.appendChild(swatch);
+    li.appendChild(labelSpan);
+    list.appendChild(li);
+  });
 }
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
@@ -382,7 +385,7 @@ function renderDiagram() {
         box.appendChild(rightBtn);
       }
 
-      // Text content in a span so it doesn't interfere with buttons
+      // Text content
       var textSpan = document.createElement("span");
       textSpan.textContent = node.text;
       textSpan.title = "Click to edit text";
@@ -392,7 +395,7 @@ function renderDiagram() {
       });
       box.appendChild(textSpan);
 
-      // Little colour badge that cycles through colours on click
+      // Colour badge
       var badge = document.createElement("div");
       badge.className = "diagram-color-badge";
       if (node.color) {
@@ -571,7 +574,12 @@ function renderNodesTable() {
     return;
   }
 
-  tableWrapper.style.display = "block";
+  // Only show table if tableVisible
+  if (!tableVisible) {
+    tableWrapper.style.display = "none";
+  } else {
+    tableWrapper.style.display = "block";
+  }
   noItemsMessage.style.display = "none";
 
   nodes.forEach(function (node) {
@@ -865,16 +873,83 @@ function uploadCsv(file) {
   });
 }
 
+/* ---------- View toggles & export ---------- */
+
+function toggleControlsVisibility() {
+  var panel = document.getElementById("controlsPanel");
+  var btn = document.getElementById("btnToggleControls");
+  if (!panel || !btn) return;
+
+  controlsVisible = !controlsVisible;
+  panel.style.display = controlsVisible ? "" : "none";
+  btn.textContent = controlsVisible ? "Hide controls" : "Show controls";
+}
+
+function toggleTableVisibility() {
+  var btn = document.getElementById("btnToggleTable");
+  if (!btn) return;
+
+  tableVisible = !tableVisible;
+  btn.textContent = tableVisible ? "Hide table" : "Show table";
+  updateAllViews();
+}
+
+function exportDiagramPng() {
+  var exportArea = document.getElementById("exportArea");
+  if (!exportArea) {
+    alert("Could not find diagram to export.");
+    return;
+  }
+
+  html2canvas(exportArea).then(function (canvas) {
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = "driver-diagram.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+  });
+}
+
+function exportDiagramPdf() {
+  var exportArea = document.getElementById("exportArea");
+  if (!exportArea) {
+    alert("Could not find diagram to export.");
+    return;
+  }
+
+  var opt = {
+    margin: 10,
+    filename: "driver-diagram.pdf",
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
+  };
+
+  html2pdf().set(opt).from(exportArea).save();
+}
+
 /* ---------- Init ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Driver Diagram Tool loaded with editable colours and contrast.");
+  console.log("Driver Diagram Tool loaded with header controls and export.");
 
   var addBtn = document.getElementById("addNodeBtn");
   var clearBtn = document.getElementById("clearAllBtn");
   var downloadBtn = document.getElementById("downloadCsvBtn");
   var uploadInput = document.getElementById("uploadCsvInput");
   var addColorBtn = document.getElementById("addColorBtn");
+
+  var btnToggleControls = document.getElementById("btnToggleControls");
+  var btnToggleTable = document.getElementById("btnToggleTable");
+  var btnHeaderClear = document.getElementById("btnHeaderClear");
+  var btnExportPng = document.getElementById("btnExportPng");
+  var btnExportPdf = document.getElementById("btnExportPdf");
 
   if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
   if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
@@ -892,6 +967,22 @@ document.addEventListener("DOMContentLoaded", function () {
     addColorBtn.addEventListener("click", function () {
       addColorOptionFromForm();
     });
+  }
+
+  if (btnToggleControls) {
+    btnToggleControls.addEventListener("click", toggleControlsVisibility);
+  }
+  if (btnToggleTable) {
+    btnToggleTable.addEventListener("click", toggleTableVisibility);
+  }
+  if (btnHeaderClear) {
+    btnHeaderClear.addEventListener("click", clearAllNodes);
+  }
+  if (btnExportPng) {
+    btnExportPng.addEventListener("click", exportDiagramPng);
+  }
+  if (btnExportPdf) {
+    btnExportPdf.addEventListener("click", exportDiagramPdf);
   }
 
   // Initial render

@@ -11,23 +11,56 @@
       padding: 1.5rem;
       background: #f5f5f5;
     }
-    header {
-      margin-bottom: 1.5rem;
+
+    /* App header */
+    header.app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      background: #005eb8; /* NHS blue */
+      color: #ffffff;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      gap: 1rem;
     }
-    h1 {
-      margin: 0 0 0.5rem;
+    .app-header h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.4rem;
     }
-    .info {
-      font-size: 0.9rem;
-      color: #555;
+    .app-header .info {
+      margin: 0;
+      font-size: 0.85rem;
+      color: #e0ecff;
       max-width: 700px;
     }
+    .header-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      justify-content: flex-end;
+    }
+    .header-buttons button {
+      border-radius: 999px;
+      border: 1px solid #ffffff;
+      background: rgba(255,255,255,0.12);
+      color: #ffffff;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .header-buttons button:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
     main {
       display: grid;
       grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
       gap: 1.5rem;
       align-items: flex-start;
     }
+
     .card {
       background: #ffffff;
       border-radius: 8px;
@@ -106,12 +139,12 @@
       padding: 0.4rem;
       margin-bottom: 0.75rem;
       background: #fafafa;
-      min-height: 200px;
+      min-height: 350px;
     }
     #diagramCanvas {
       position: relative;
       width: 100%;
-      min-height: 300px;
+      min-height: 350px;
     }
     #diagramConnections {
       position: absolute;
@@ -123,7 +156,7 @@
       position: relative;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 2.5rem;
+      gap: 3.5rem;
     }
     .diagram-column {
       display: flex;
@@ -184,11 +217,10 @@
     .diagram-add-right {
       right: -10px;
     }
-     
-	.diagram-color-badge {
+    .diagram-color-badge {
       position: absolute;
       bottom: 3px;
-      right: 10px;
+      right: 15px;
       width: 14px;
       height: 14px;
       border-radius: 50%;
@@ -227,7 +259,6 @@
       box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
     }
 
-
     table {
       width: 100%;
       border-collapse: collapse;
@@ -244,6 +275,16 @@
       background: #f5f5f5;
     }
 
+    @media (max-width: 900px) {
+      header.app-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .header-buttons {
+        justify-content: flex-start;
+      }
+    }
+
     @media (max-width: 800px) {
       main {
         grid-template-columns: 1fr;
@@ -256,20 +297,31 @@
 
   <!-- PapaParse for CSV import/export -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.2/papaparse.min.js"></script>
+  <!-- html2canvas + html2pdf for PNG/PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Driver Diagram Tool</h1>
-    <p class="info">
-      Early version of a web-based driver diagram tool. Add an aim, primary/secondary
-      drivers and change ideas, download them as CSV, and re-upload later to carry on.
-      Boxes can be coloured using configurable colour options.
-    </p>
+  <header class="app-header">
+    <div>
+      <h1>Driver Diagram Tool</h1>
+      <p class="info">
+        Web-based driver diagram tool. Add an aim, primary/secondary drivers and change ideas,
+        download as CSV, and export the visual diagram for reports. Colours and legend can be configured.
+      </p>
+    </div>
+    <div class="header-buttons">
+      <button id="btnToggleControls">Hide controls</button>
+      <button id="btnToggleTable">Hide table</button>
+      <button id="btnHeaderClear">Clear all</button>
+      <button id="btnExportPng">Export chart (PNG)</button>
+      <button id="btnExportPdf">Export PDF</button>
+    </div>
   </header>
 
   <main>
     <!-- Left column: data entry + CSV + colours -->
-    <section class="card">
+    <section class="card" id="controlsPanel">
       <h2>1. Add items</h2>
 
       <label for="nodeText">Text</label>
@@ -330,6 +382,7 @@
       <p class="small">
         Define optional colours you can apply to boxes. For example, you might use
         different colours for related primary drivers or to highlight priority areas.
+        Click an existing colour in the list to edit it.
       </p>
 
       <label for="colorLabelInput">Label for colour</label>
@@ -339,32 +392,34 @@
       <input id="colorValueInput" type="color" value="#fff7cc">
 
       <div class="buttons">
-        <button id="addColorBtn" class="secondary">Add colour option</button>
+        <button id="addColorBtn" class="secondary">Add / update colour option</button>
       </div>
 
       <ul id="colorOptionsList" class="small" style="margin-top:0.5rem;padding-left:1rem;"></ul>
     </section>
 
-    <!-- Right column: diagram + table -->
+    <!-- Right column: diagram + legend + table -->
     <section class="card" id="diagramArea">
       <h2>4. Diagram & items</h2>
 
-      <div id="diagramCanvasWrapper">
-        <div id="diagramCanvas">
-          <svg id="diagramConnections"></svg>
-          <div id="diagramColumns"></div>
+      <!-- Export area: diagram + legend (used for PNG/PDF export) -->
+      <div id="exportArea">
+        <div id="diagramCanvasWrapper">
+          <div id="diagramCanvas">
+            <svg id="diagramConnections"></svg>
+            <div id="diagramColumns"></div>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div id="legend">
+          <p class="legend-title">Legend</p>
+          <p class="small" id="legendEmptyMessage">
+            No colours defined yet. Add colours on the left to see them listed here.
+          </p>
+          <ul id="legendList"></ul>
         </div>
       </div>
-
-   <!-- Legend -->
-      <div id="legend">
-        <p class="legend-title">Legend</p>
-        <p class="small" id="legendEmptyMessage">
-          No colours defined yet. Add colours on the left to see them listed here.
-        </p>
-        <ul id="legendList"></ul>
-      </div>
-
 
       <h3 style="margin-top: 0.75rem;">Table view</h3>
       <p class="small" id="noItemsMessage">
@@ -376,7 +431,7 @@
             <tr>
               <th class="nowrap">ID</th>
               <th>Level</th>
-	      <th>Colour</th>
+              <th>Colour</th>
               <th>Parent</th>
               <th>Text</th>
               <th></th>
