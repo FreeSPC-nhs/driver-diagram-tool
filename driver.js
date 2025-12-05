@@ -4,6 +4,8 @@
 var nodes = [];
 var nextId = 1;
 var connections = [];
+var legendVisible = true;
+
 
 // Diagram appearance settings (defaults)
 var diagramAppearance = {
@@ -397,6 +399,8 @@ function renderDiagram() {
         box.style.fontFamily = ""; // inherit
       }
       box.style.fontWeight = diagramAppearance.fontBold ? "700" : "400"; 
+      box.style.marginTop = (diagramAppearance.verticalGap / 2) + "px";
+      box.style.marginBottom = (diagramAppearance.verticalGap / 2) + "px";
     }
 
       // Apply colour fill if set
@@ -1228,6 +1232,19 @@ function exportDiagramPdf() {
   });
 }
 
+function updateLegendVisibility() {
+    var legend = document.getElementById("legendContainer");
+    var btn = document.getElementById("toggleLegendBtn");
+
+    if (legendVisible) {
+        legend.style.display = "block";
+        btn.textContent = "Hide legend";
+    } else {
+        legend.style.display = "none";
+        btn.textContent = "Show legend";
+    }
+}
+
 
 /* ---------- Init ---------- */
 
@@ -1283,6 +1300,16 @@ document.addEventListener("DOMContentLoaded", function () {
   if (applyAppearanceBtn) {
     applyAppearanceBtn.addEventListener("click", applyDiagramAppearanceFromInputs);
   }
+	
+  var btnToggleLegend = document.getElementById("toggleLegendBtn");
+
+  if (btnToggleLegend) {
+    btnToggleLegend.addEventListener("click", function () {
+      legendVisible = !legendVisible;
+      updateLegendVisibility();
+    });
+  }
+
 
   // Set up collapsible sections in controls panel
   setupCollapsibleSections();

@@ -170,7 +170,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      justify-content:  space-evenly;
+      justify-content:  space-between;
     }
 
     /* For the Aim column, centre its single node vertically */
@@ -367,6 +367,7 @@
     <div class="header-buttons">
       <button id="btnToggleControls">Hide controls</button>
       <button id="btnToggleTable">Hide table</button>
+      <button id="toggleLegendBtn">Hide legend</button>
       <button id="btnHeaderClear">Clear all</button>
       <button id="btnExportPng">Export chart (PNG)</button>
       <button id="btnExportPdf">Export PDF</button>
@@ -521,13 +522,15 @@
         </div>
 
         <!-- Legend -->
-        <div id="legend">
+	<div id="legendContainer">
+	<div id="legend">
           <p class="legend-title">Legend</p>
           <p class="small" id="legendEmptyMessage">
             No colours defined yet. Add colours on the left to see them listed here.
           </p>
           <ul id="legendList"></ul>
         </div>
+	</div>
       </div>
 
       <h3 style="margin-top: 0.75rem;">Table view</h3>
