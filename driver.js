@@ -789,6 +789,7 @@ function updateAllViews() {
   refreshColorSelect();
   renderColorOptionsList();
   renderLegend();
+  updateLegendVisibility();
 }
 
 /* ---------- Actions from the form ---------- */
