@@ -539,8 +539,15 @@ function drawConnections(canvas, svg) {
     svg.removeChild(svg.firstChild);
   }
 
-    svg.setAttribute("width", canvasRect.width);
-  svg.setAttribute("height", canvasRect.height);
+  var w = canvasRect.width;
+  var h = canvasRect.height;
+
+  svg.setAttribute("width", w);
+  svg.setAttribute("height", h);
+  // NEW: ensure the SVG coordinate system matches what we draw
+  svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+
+
 
   connections.forEach(function (conn) {
     var parentEl = canvas.querySelector(
@@ -1177,61 +1184,72 @@ function toggleTableVisibility() {
 }
 
 function exportDiagramPng() {
-  var exportArea = document.getElementById("exportArea");
-  if (!exportArea) {
-    alert("Could not find diagram to export.");
-    return;
-  }
+    var exportArea = document.getElementById("exportArea");
+    if (!exportArea) {
+        alert("Could not find diagram to export.");
+        return;
+    }
 
-  // Hide badges during export
-  exportArea.classList.add("hide-badges");
+    // 1. Hide connectors & badges
+    exportArea.classList.add("export-clean");
 
-  html2canvas(exportArea).then(function (canvas) {
-    exportArea.classList.remove("hide-badges");
+    // 2. Force re-render of SVG before snapshot
+    renderDiagram();
 
-    canvas.toBlob(function (blob) {
-      if (!blob) return;
-      var url = URL.createObjectURL(blob);
-      var link = document.createElement("a");
-      link.href = url;
-      link.download = "driver-diagram.png";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    });
-  }).catch(function (err) {
-    exportArea.classList.remove("hide-badges");
-    console.error(err);
-  });
+    // 3. Small delay ensures the DOM fully updates before html2canvas runs
+    setTimeout(function () {
+        html2canvas(exportArea, {
+            scale: 2,
+            useCORS: true,
+            logging: false
+        }).then(function (canvas) {
+            exportArea.classList.remove("export-clean");
+
+            canvas.toBlob(function (blob) {
+                if (!blob) return;
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement("a");
+                link.href = url;
+                link.download = "driver-diagram.png";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            });
+        }).catch(function (err) {
+            console.error("PNG export error:", err);
+            exportArea.classList.remove("export-clean");
+        });
+    }, 50);  // <= this delay is essential
 }
 
 
 function exportDiagramPdf() {
-  var exportArea = document.getElementById("exportArea");
-  if (!exportArea) {
-    alert("Could not find diagram to export.");
-    return;
-  }
+    var exportArea = document.getElementById("exportArea");
+    if (!exportArea) {
+        alert("Could not find diagram to export.");
+        return;
+    }
 
-  var opt = {
-    margin: 10,
-    filename: "driver-diagram.pdf",
-    image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
-  };
+    exportArea.classList.add("export-clean");
+    renderDiagram();
 
-  // Hide badges during export
-  exportArea.classList.add("hide-badges");
+    setTimeout(function () {
+        var opt = {
+            margin: 10,
+            filename: "driver-diagram.pdf",
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
+        };
 
-  html2pdf().set(opt).from(exportArea).save().then(function () {
-    exportArea.classList.remove("hide-badges");
-  }).catch(function (err) {
-    exportArea.classList.remove("hide-badges");
-    console.error(err);
-  });
+        html2pdf().set(opt).from(exportArea).save().then(function () {
+            exportArea.classList.remove("export-clean");
+        }).catch(function () {
+            exportArea.classList.remove("export-clean");
+        });
+    }, 50);
 }
+
 
 function updateLegendVisibility() {
     var legend = document.getElementById("legendContainer");
