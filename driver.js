@@ -788,6 +788,22 @@ function applyDiagramAppearanceFromInputs() {
   updateAllViews();
 }
 
+function setAppearanceInputsFromConfig() {
+  var hInput = document.getElementById("boxHeightInput");
+  var gInput = document.getElementById("boxGapInput");
+  var fsInput = document.getElementById("boxFontSizeInput");
+  var ffInput = document.getElementById("boxFontFamilyInput");
+  var boldInput = document.getElementById("boxFontBoldInput");
+
+  if (!hInput || !gInput || !fsInput || !ffInput || !boldInput) return;
+
+  hInput.value = diagramAppearance.boxHeight;
+  gInput.value = diagramAppearance.verticalGap;
+  fsInput.value = diagramAppearance.fontSize;
+  ffInput.value = diagramAppearance.fontFamily || "";
+  boldInput.checked = !!diagramAppearance.fontBold;
+}
+
 
 function updateAllViews() {
   renderNodesTable();
@@ -1042,7 +1058,12 @@ function downloadCsv() {
       parent_id: mainParentId,
       text: n.text,
       color: n.color || "",
-      extra_parents: extraParents.join(";")
+      extra_parents: extraParents.join(";"),
+      box_height: diagramAppearance.boxHeight,
+      vertical_gap: diagramAppearance.verticalGap,
+      font_size: diagramAppearance.fontSize,
+      font_family: diagramAppearance.fontFamily || "",
+      font_bold: diagramAppearance.fontBold ? "1" : "0"
     };
   });
 
@@ -1073,8 +1094,8 @@ function uploadCsv(file) {
 
       var rows = results.data;
       var imported = [];
-
-            var extraConnectionsRaw = []; // temp storage: { childId, parents[] }
+      var extraConnectionsRaw = []; // { childId, parents[] }
+      var appearanceFromCsv = null;
 
       rows.forEach(function (row, index) {
         var id = (row.id || "").toString().trim();
@@ -1113,13 +1134,40 @@ function uploadCsv(file) {
             extraConnectionsRaw.push({ childId: id, parents: parents });
           }
         }
-      });
 
+        // --- NEW: appearance settings (read once, from first row that has them) ---
+        if (!appearanceFromCsv) {
+          var bh = parseInt(row.box_height, 10);
+          var vg = parseInt(row.vertical_gap, 10);
+          var fs = parseInt(row.font_size, 10);
+          var ff = (row.font_family || "").toString();
+          var fbRaw = (row.font_bold || "").toString().trim().toLowerCase();
+          var fb = fbRaw === "1" || fbRaw === "true" || fbRaw === "yes";
+
+          var hasAny =
+            (row.box_height && !isNaN(bh)) ||
+            (row.vertical_gap && !isNaN(vg)) ||
+            (row.font_size && !isNaN(fs)) ||
+            ff ||
+            fbRaw;
+
+          if (hasAny) {
+            appearanceFromCsv = {
+              boxHeight: isFinite(bh) && bh > 0 ? bh : diagramAppearance.boxHeight,
+              verticalGap: isFinite(vg) && vg >= 0 ? vg : diagramAppearance.verticalGap,
+              fontSize: isFinite(fs) && fs > 0 ? fs : diagramAppearance.fontSize,
+              fontFamily: ff,
+              fontBold: fb
+            };
+          }
+        }
+      });
 
       nodes = imported;
       updateNextIdFromNodes();
       rebuildColorOptionsFromNodes();
-            // First, rebuild baseline connections from primary parent_id
+
+      // First, rebuild baseline connections from primary parent_id
       rebuildConnectionsFromParents();
 
       // Then add extra connections from extra_parents
@@ -1139,6 +1187,16 @@ function uploadCsv(file) {
           }
         });
       });
+
+      // Apply appearance settings from CSV (if present)
+      if (appearanceFromCsv) {
+        diagramAppearance.boxHeight = appearanceFromCsv.boxHeight;
+        diagramAppearance.verticalGap = appearanceFromCsv.verticalGap;
+        diagramAppearance.fontSize = appearanceFromCsv.fontSize;
+        diagramAppearance.fontFamily = appearanceFromCsv.fontFamily;
+        diagramAppearance.fontBold = appearanceFromCsv.fontBold;
+        setAppearanceInputsFromConfig();
+      }
 
       updateAllViews();
       alert("Loaded " + nodes.length + " items from CSV.");
@@ -1434,5 +1492,6 @@ document.addEventListener("DOMContentLoaded", function () {
  
 // Initial render (using default appearance)
   applyDiagramAppearanceFromInputs();
+  setAppearanceInputsFromConfig();
 
 });
