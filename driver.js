@@ -1183,72 +1183,171 @@ function toggleTableVisibility() {
   updateAllViews();
 }
 
-function exportDiagramPng() {
-    var exportArea = document.getElementById("exportArea");
-    if (!exportArea) {
-        alert("Could not find diagram to export.");
+// Helper: temporarily replace the live SVG with an <img> snapshot
+// so html2canvas / html2pdf capture lines reliably.
+
+function withSvgImageOverlay(runCapture) {
+  var exportArea = document.getElementById("exportArea");
+  var svg = document.getElementById("diagramConnections");
+  var canvasDiv = document.getElementById("diagramCanvas");
+  if (!exportArea || !svg || !canvasDiv) {
+    // Fallback: run capture directly
+    return runCapture();
+  }
+
+  // Make sure positions + connections are up to date
+  updateAllViews();
+
+  var serializer;
+  try {
+    serializer = new XMLSerializer();
+  } catch (e) {
+    console.error("XMLSerializer not available, capturing directly.", e);
+    return runCapture();
+  }
+
+  var svgClone = svg.cloneNode(true);
+  var svgString = serializer.serializeToString(svgClone);
+  var dataUrl =
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(svgString);
+
+  return new Promise(function (resolve, reject) {
+    var img = new Image();
+    img.onload = function () {
+      // Hide original SVG and overlay the image in the same spot
+      svg.style.visibility = "hidden";
+      img.style.position = "absolute";
+      img.style.top = "0";
+      img.style.left = "0";
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.pointerEvents = "none";
+
+      canvasDiv.appendChild(img);
+
+      var p;
+      try {
+        p = runCapture();
+      } catch (err) {
+        cleanup();
+        reject(err);
         return;
-    }
+      }
 
-    // 1. Hide connectors & badges
-    exportArea.classList.add("export-clean");
+      function cleanup() {
+        try {
+          canvasDiv.removeChild(img);
+        } catch (e) {}
+        svg.style.visibility = "";
+      }
 
-    // 2. Force re-render of SVG before snapshot
-    renderDiagram();
-
-    // 3. Small delay ensures the DOM fully updates before html2canvas runs
-    setTimeout(function () {
-        html2canvas(exportArea, {
-            scale: 2,
-            useCORS: true,
-            logging: false
-        }).then(function (canvas) {
-            exportArea.classList.remove("export-clean");
-
-            canvas.toBlob(function (blob) {
-                if (!blob) return;
-                var url = URL.createObjectURL(blob);
-                var link = document.createElement("a");
-                link.href = url;
-                link.download = "driver-diagram.png";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            });
+      if (p && typeof p.then === "function") {
+        p.then(function (result) {
+          cleanup();
+          resolve(result);
         }).catch(function (err) {
-            console.error("PNG export error:", err);
-            exportArea.classList.remove("export-clean");
+          cleanup();
+          reject(err);
         });
-    }, 50);  // <= this delay is essential
+      } else {
+        cleanup();
+        resolve(p);
+      }
+    };
+
+    img.onerror = function (err) {
+      console.error("SVG image overlay failed, capturing directly.", err);
+      // Fallback: run capture without overlay
+      try {
+        var p2 = runCapture();
+        if (p2 && typeof p2.then === "function") {
+          p2.then(resolve).catch(reject);
+        } else {
+          resolve(p2);
+        }
+      } catch (e2) {
+        reject(e2);
+      }
+    };
+
+    img.src = dataUrl;
+  });
 }
+
+
+
+function exportDiagramPng() {
+  var exportArea = document.getElementById("exportArea");
+  if (!exportArea) {
+    alert("Could not find diagram to export.");
+    return;
+  }
+
+  // Hide badges + add/connect buttons for export
+  exportArea.classList.add("export-clean");
+
+  withSvgImageOverlay(function () {
+    // Return the html2canvas promise so the helper can clean up afterwards
+    return html2canvas(exportArea, {
+      scale: 2,
+      useCORS: true,
+      logging: false
+    });
+  })
+    .then(function (canvas) {
+      exportArea.classList.remove("export-clean");
+      if (!canvas) return;
+
+      canvas.toBlob(function (blob) {
+        if (!blob) return;
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = "driver-diagram.png";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      });
+    })
+    .catch(function (err) {
+      console.error("PNG export error:", err);
+      exportArea.classList.remove("export-clean");
+    });
+}
+
 
 
 function exportDiagramPdf() {
-    var exportArea = document.getElementById("exportArea");
-    if (!exportArea) {
-        alert("Could not find diagram to export.");
-        return;
-    }
+  var exportArea = document.getElementById("exportArea");
+  if (!exportArea) {
+    alert("Could not find diagram to export.");
+    return;
+  }
 
-    exportArea.classList.add("export-clean");
-    renderDiagram();
+  var opt = {
+    margin: 10,
+    filename: "driver-diagram.pdf",
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
+  };
 
-    setTimeout(function () {
-        var opt = {
-            margin: 10,
-            filename: "driver-diagram.pdf",
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
-        };
+  exportArea.classList.add("export-clean");
 
-        html2pdf().set(opt).from(exportArea).save().then(function () {
-            exportArea.classList.remove("export-clean");
-        }).catch(function () {
-            exportArea.classList.remove("export-clean");
-        });
-    }, 50);
+  withSvgImageOverlay(function () {
+    // html2pdf returns a Promise
+    return html2pdf().set(opt).from(exportArea).save();
+  })
+    .then(function () {
+      exportArea.classList.remove("export-clean");
+    })
+    .catch(function (err) {
+      console.error("PDF export error:", err);
+      exportArea.classList.remove("export-clean");
+    });
 }
+
 
 
 function updateLegendVisibility() {
