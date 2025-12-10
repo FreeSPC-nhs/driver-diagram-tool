@@ -419,40 +419,45 @@ function renderDiagram() {
       var nextLevel = getNextLevel(level);
 
 	if (prevLevel && level !== "primary") {
-        var leftBtn = document.createElement("button");
-        leftBtn.type = "button";
-        leftBtn.className = "diagram-add diagram-add-left";
-	// Size the connector to match box height
-        if (diagramAppearance && diagramAppearance.boxHeight) {
-          var h = diagramAppearance.boxHeight;
-          leftBtn.style.height = h + "px";
-          leftBtn.style.width = h + "px";
-          leftBtn.style.borderRadius = (h / 2) + "px";
-	  leftBtn.style.left = -(h / 2) + "px";
-        }	
-	// Match connector colour to node
-	if (node.color) {
-  	leftBtn.style.backgroundColor = node.color;
-  	leftBtn.style.borderColor = node.color;
-  	leftBtn.style.color = getContrastingTextColor(node.color); // keep symbol readable
-	} else {
-  	leftBtn.style.backgroundColor = "#ffffff";
-  	leftBtn.style.borderColor = "#d0d7de";
-  	leftBtn.style.color = "#555";
-	}
-        leftBtn.textContent = "📌"; 
-        leftBtn.title =
-          "Connect this item to an existing " + getLevelLabel(prevLevel);
-        leftBtn.setAttribute(
-          "aria-label",
-          "Connect to existing " + getLevelLabel(prevLevel)
-        );
-        leftBtn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          addConnectionForNode(node.id);
-        });
-        box.appendChild(leftBtn);
-      }
+  var leftBtn = document.createElement("button");
+  leftBtn.type = "button";
+  leftBtn.className = "diagram-add diagram-add-left";
+
+  // Size the connector to match box height
+  if (diagramAppearance && diagramAppearance.boxHeight) {
+    var h = diagramAppearance.boxHeight;
+    leftBtn.style.height = h + "px";
+    leftBtn.style.width = h + "px";
+    leftBtn.style.borderRadius = (h / 2) + "px";
+    leftBtn.style.left = -(h / 2) + "px";
+  }
+
+  // Match connector colour to node
+  if (node.color) {
+    leftBtn.style.backgroundColor = node.color;
+    leftBtn.style.borderColor = node.color;
+    leftBtn.style.color = getContrastingTextColor(node.color); // keep symbol readable
+  } else {
+    leftBtn.style.backgroundColor = "#ffffff";
+    leftBtn.style.borderColor = "#d0d7de";
+    leftBtn.style.color = "#555";
+  }
+
+  leftBtn.textContent = "📌";
+  leftBtn.title =
+    "Add or remove a connection to a " + getLevelLabel(prevLevel);
+  leftBtn.setAttribute(
+    "aria-label",
+    "Add or remove connection to " + getLevelLabel(prevLevel)
+  );
+
+  leftBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    handleConnectionButtonClick(node.id); // 👈 use the new manager
+  });
+
+  box.appendChild(leftBtn);
+}
 
 
       if (nextLevel) {
@@ -948,6 +953,105 @@ function addConnectionForNode(nodeId) {
   }
 
   updateAllViews();
+}
+
+function removeConnectionForNode(nodeId) {
+  var refNode = nodes.find(function (n) {
+    return n.id === nodeId;
+  });
+  if (!refNode) return;
+
+  // All parents that currently have a line to this node
+  var parentIds = connections
+    .filter(function (c) {
+      return c.toId === nodeId;
+    })
+    .map(function (c) {
+      return c.fromId;
+    });
+
+  // Deduplicate
+  parentIds = parentIds.filter(function (pid, idx, arr) {
+    return arr.indexOf(pid) === idx;
+  });
+
+  if (!parentIds.length) {
+    alert("This item has no incoming connections to remove.");
+    return;
+  }
+
+  var listText = parentIds
+    .map(function (pid) {
+      var parent = nodes.find(function (n) {
+        return n.id === pid;
+      });
+      var label = parent ? parent.text : "(missing item)";
+      if (label.length > 40) {
+        label = label.slice(0, 37) + "…";
+      }
+      return "[" + pid + "] " + label;
+    })
+    .join("\n");
+
+  var input = window.prompt(
+    "Enter the ID of the parent connection you want to remove:\n\n" +
+      listText,
+    parentIds[0]
+  );
+  if (input === null) return;
+  var parentId = input.trim();
+  if (!parentId || parentIds.indexOf(parentId) === -1) {
+    alert("No connection found for ID " + parentId + ".");
+    return;
+  }
+
+  // Remove that specific connection
+  connections = connections.filter(function (c) {
+    return !(c.fromId === parentId && c.toId === nodeId);
+  });
+
+  // If this was the 'main' parent, update parentId to another parent (if any)
+  if (refNode.parentId === parentId) {
+    var remainingParents = connections
+      .filter(function (c) {
+        return c.toId === nodeId;
+      })
+      .map(function (c) {
+        return c.fromId;
+      });
+
+    refNode.parentId = remainingParents.length ? remainingParents[0] : "";
+  }
+
+  updateAllViews();
+}
+
+function handleConnectionButtonClick(nodeId) {
+  // Does this node currently have any incoming connections?
+  var hasParents = connections.some(function (c) {
+    return c.toId === nodeId;
+  });
+
+  // If there are no parents, just add a new connection as before
+  if (!hasParents) {
+    addConnectionForNode(nodeId);
+    return;
+  }
+
+  var choice = window.prompt(
+    "What would you like to do?\n\n" +
+      "1 = Add a new connection\n" +
+      "2 = Remove an existing connection",
+    "1"
+  );
+  if (choice === null) return;
+  choice = choice.trim();
+
+  if (choice === "1") {
+    addConnectionForNode(nodeId);
+  } else if (choice === "2") {
+    removeConnectionForNode(nodeId);
+  }
 }
 
 
