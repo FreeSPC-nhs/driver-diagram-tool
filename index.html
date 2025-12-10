@@ -341,6 +341,66 @@
       display: none;
     }
 
+    /* Help / info modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-overlay.is-open {
+      display: flex;
+    }
+    .modal-dialog {
+      background: #ffffff;
+      max-width: 820px;
+      width: 90%;
+      max-height: 80vh;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      padding: 1.25rem 1.5rem;
+      overflow-y: auto;
+      position: relative;
+      font-size: 0.9rem;
+    }
+    .modal-dialog h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    .modal-dialog h3 {
+      margin-bottom: 0.25rem;
+      margin-top: 1rem;
+      font-size: 1rem;
+    }
+    .modal-dialog p {
+      margin-top: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .modal-dialog ul {
+      margin-top: 0.25rem;
+      margin-bottom: 0.5rem;
+      padding-left: 1.25rem;
+    }
+    .modal-close-btn {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.6rem;
+      border: none;
+      background: transparent;
+      color: #555;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .modal-close-btn:hover {
+      color: #000;
+    }
+    .faq-question {
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
 
 
     @media (max-width: 800px) {
@@ -371,7 +431,8 @@
       </p>
     </div>
     <div class="header-buttons">
-      <button id="btnToggleControls">Hide controls</button>
+	<button id="btnHelp">Help / info</button>      
+	<button id="btnToggleControls">Hide controls</button>
       <button id="btnToggleTable">Hide table</button>
       <button id="toggleLegendBtn">Hide legend</button>
       <button id="btnHeaderClear">Clear all</button>
@@ -560,6 +621,106 @@
       </div>
     </section>
   </main>
+
+  <!-- Help / FAQ and About modal -->
+  <div id="helpOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+      <button class="modal-close-btn" id="helpCloseBtn" aria-label="Close help">×</button>
+
+      <h2 id="helpModalTitle">Help & information</h2>
+
+      <h3>Using this tool</h3>
+      <p>
+        This web-based driver diagram tool lets you build an aim, primary and secondary
+        drivers, and change ideas, then export the diagram for reports or presentations.
+      </p>
+
+      <p class="faq-question">How do I add items?</p>
+      <ul>
+        <li>Use <strong>1. Add items</strong> on the left to enter the text and level.</li>
+        <li>Choose a <strong>parent</strong> if you already know what it should connect to
+            (e.g. a primary driver for a new secondary driver).</li>
+        <li>Click <strong>Add item</strong> to add it to the diagram and table.</li>
+      </ul>
+
+      <p class="faq-question">How do I connect or re-connect boxes?</p>
+      <ul>
+        <li>Use the <strong>round connector on the right</strong> of a box to add a new child
+            at the next level (e.g. secondary driver under a primary).</li>
+        <li>Use the <strong>round connector on the left</strong> of a box to
+          <strong>add or remove</strong> connections to items at the previous level.</li>
+        <li>You can have more than one connection into a box (e.g. a change idea linked to
+            two secondary drivers).</li>
+      </ul>
+
+      <p class="faq-question">How do I edit text or colours?</p>
+      <ul>
+        <li>Click on the <strong>text inside a box</strong> to edit it.</li>
+        <li>Click the small <strong>colour badge</strong> on the right of a box to cycle
+            through the colour options you have defined.</li>
+        <li>Use <strong>3. Colour options</strong> on the left to define or edit your palette.</li>
+      </ul>
+
+      <p class="faq-question">How do I change the look of the diagram?</p>
+      <ul>
+        <li>Open <strong>4. Diagram appearance</strong> on the left.</li>
+        <li>Adjust box height, vertical spacing, text size, font and boldness.</li>
+        <li>Click <strong>Apply appearance</strong> to update the diagram.</li>
+        <li>These settings are saved into the CSV so importing will restore your layout.</li>
+      </ul>
+
+      <p class="faq-question">How do I save and reload my work?</p>
+      <ul>
+        <li>Use <strong>Download CSV</strong> to save a copy of the driver diagram
+            (including connections, colours and appearance settings).</li>
+        <li>Use <strong>Upload CSV</strong> to reload a saved diagram and continue editing.</li>
+      </ul>
+
+      <p class="faq-question">How do I export for reports?</p>
+      <ul>
+        <li>Use the header buttons <strong>Export chart (PNG)</strong> or <strong>Export PDF</strong>.</li>
+        <li>The export hides connector buttons and colour badges so you get a clean diagram.</li>
+        <li>You can also hide the legend and table first if you only want the diagram itself.</li>
+      </ul>
+
+      <hr>
+
+      <h3>About driver diagrams</h3>
+      <p>
+        Driver diagrams are improvement tools that show how your overall <strong>aim</strong>
+        is linked to the key factors that need to change, and the specific ideas you will test.
+        They are widely used in quality improvement work across health and care.
+      </p>
+
+      <ul>
+        <li><strong>Aim</strong> – the overarching goal you are trying to achieve, usually
+            time-bound and measurable (e.g. “Reduce unplanned readmissions by 20% in 12 months”).</li>
+        <li><strong>Primary drivers</strong> – the big components or system features that must
+            change to achieve the aim (e.g. “Effective discharge planning”).</li>
+        <li><strong>Secondary drivers</strong> – more specific factors that sit underneath each
+            primary driver (e.g. “Clear discharge criteria”, “Timely follow-up”).</li>
+        <li><strong>Change ideas</strong> – practical changes you can test that are expected to
+            influence one or more secondary (or primary) drivers.</li>
+      </ul>
+
+      <p>
+        You can read a driver diagram from left to right: if we implement these
+        <strong>change ideas</strong>, they should influence our <strong>secondary and primary
+        drivers</strong>, and together these should help us achieve our <strong>aim</strong>.
+      </p>
+
+      <p>
+        The diagram can also act as a living document: as you learn from testing change ideas
+        (for example using run charts or SPC), you can add, adapt or retire change ideas and
+        update the diagram to reflect your latest thinking.
+      </p>
+    </div>
+  </div>
+
+  <script src="driver.js"></script>
+</body>
+</html>
+
 
   <script src="driver.js"></script>
 </body>

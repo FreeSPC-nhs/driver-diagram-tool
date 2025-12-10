@@ -1525,6 +1525,23 @@ function updateLegendVisibility() {
     }
 }
 
+/* ---------- Help / info modal ---------- */
+
+function openHelpOverlay() {
+  var overlay = document.getElementById("helpOverlay");
+  if (!overlay) return;
+  overlay.classList.add("is-open");
+  overlay.setAttribute("aria-hidden", "false");
+}
+
+function closeHelpOverlay() {
+  var overlay = document.getElementById("helpOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("is-open");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+
 
 /* ---------- Init ---------- */
 
@@ -1543,6 +1560,9 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnExportPng = document.getElementById("btnExportPng");
   var btnExportPdf = document.getElementById("btnExportPdf");
   var applyAppearanceBtn = document.getElementById("applyAppearanceBtn");
+  var btnHelp = document.getElementById("btnHelp");
+  var helpOverlay = document.getElementById("helpOverlay");
+  var helpCloseBtn = document.getElementById("helpCloseBtn");
 
   if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
   if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
@@ -1580,6 +1600,32 @@ document.addEventListener("DOMContentLoaded", function () {
   if (applyAppearanceBtn) {
     applyAppearanceBtn.addEventListener("click", applyDiagramAppearanceFromInputs);
   }
+
+ // Help / info modal
+  if (btnHelp) {
+    btnHelp.addEventListener("click", function () {
+      openHelpOverlay();
+    });
+  }
+  if (helpCloseBtn) {
+    helpCloseBtn.addEventListener("click", function () {
+      closeHelpOverlay();
+    });
+  }
+  if (helpOverlay) {
+    // Close when clicking on the dimmed background
+    helpOverlay.addEventListener("click", function (e) {
+      if (e.target === helpOverlay) {
+        closeHelpOverlay();
+      }
+    });
+  }
+  // Optional: close with Escape key
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      closeHelpOverlay();
+    }
+  });
 	
   var btnToggleLegend = document.getElementById("toggleLegendBtn");
 
