@@ -560,7 +560,7 @@ title.addEventListener("keydown", function (e) {
   if (diagramAppearance && diagramAppearance.boxHeight) {
     var h = diagramAppearance.boxHeight;
     leftBtn.style.height = h + "px";
-    leftBtn.style.width = h + "px";
+    leftBtn.style.width = Math.round(h * 0.6) + "px";
     leftBtn.style.borderRadius = (h / 2) + "px";
     leftBtn.style.left = -(h / 2) + "px";
   }
@@ -601,7 +601,7 @@ title.addEventListener("keydown", function (e) {
         if (diagramAppearance && diagramAppearance.boxHeight) {
           var h2 = diagramAppearance.boxHeight;
           rightBtn.style.height = h2 + "px";
-          rightBtn.style.width = h2 + "px";
+          rightBtn.style.width = Math.round(h2 * 0.6) + "px";
           rightBtn.style.borderRadius = (h2 / 2) + "px";
 	  rightBtn.style.right = -(h2 / 2) + "px"; 
         }		
