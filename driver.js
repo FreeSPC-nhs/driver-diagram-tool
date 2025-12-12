@@ -27,7 +27,6 @@ var diagramAppearance = {
 
 // Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
 var colorOptions = [];
-var editingColorIndex = -1; // which colour option is being edited (if any)
 
 // View state
 var controlsVisible = true;
@@ -105,6 +104,8 @@ function getLevelLabel(level) {
 
 /* ---------- Colour helpers ---------- */
 
+var editingColorValue = null; // value (hex) of the colour currently being edited
+
 function refreshColorSelect() {
   var select = document.getElementById("nodeColor");
   if (!select) return;
@@ -153,10 +154,10 @@ function renderColorOptionsList() {
     li.style.cursor = "pointer";
     li.title = "Click to edit this colour";
 
-    var labelText = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
-    li.textContent = labelText;
+    li.textContent = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
 
-    if (index === editingColorIndex) {
+    // underline the one we're editing
+    if (editingColorValue && opt.value.toLowerCase() === editingColorValue.toLowerCase()) {
       li.style.fontWeight = "600";
       li.style.textDecoration = "underline";
     }
@@ -166,9 +167,10 @@ function renderColorOptionsList() {
       var valueInput = document.getElementById("colorValueInput");
       if (!labelInput || !valueInput) return;
 
-      editingColorValue = opt.value;
+      editingColorValue = opt.value;   // <-- THIS is the edit marker
       labelInput.value = opt.label;
       valueInput.value = opt.value;
+
       renderColorOptionsList();
     });
 
@@ -183,85 +185,79 @@ function addColorOptionFromForm() {
 
   var label = (labelInput.value || "").trim();
   var value = (valueInput.value || "").trim();
-  if (!value) { alert("Please choose a colour value."); return; }
+
+  if (!value) {
+    alert("Please choose a colour value.");
+    return;
+  }
 
   var isEditing = !!editingColorValue;
 
-  // only auto-name when adding new
+  // Only auto-name when adding (not when editing)
   if (!label) {
-    label = isEditing
-      ? (colorOptions.find(c => c.value === editingColorValue)?.label || "")
-      : "Colour " + (colorOptions.length + 1);
+    if (!isEditing) {
+      label = "Colour " + (colorOptions.length + 1);
+    } else {
+      // keep existing label if user erased it
+      var existingLabel = colorOptions.find(function (c) {
+        return c.value.toLowerCase() === editingColorValue.toLowerCase();
+      });
+      label = existingLabel ? existingLabel.label : "";
+    }
   }
 
   if (isEditing) {
     var oldValue = editingColorValue;
 
-    // find the option we meant to edit (by old value)
     var target = colorOptions.find(function (c) {
       return c.value.toLowerCase() === oldValue.toLowerCase();
     });
 
     if (!target) {
-      // if it vanished somehow, fall back to "add"
-      colorOptions.push({ label, value });
+      // fallback: if not found, add new
+      colorOptions.push({ label: label, value: value });
     } else {
-      // prevent clashes: if user changed value to one that already exists, merge
-      var clash = colorOptions.find(function (c) {
-        return c !== target && c.value.toLowerCase() === value.toLowerCase();
-      });
+      target.label = label;
+      target.value = value;
 
-      if (clash) {
-        clash.label = label;
-        // move all nodes from oldValue to clash.value
-        nodes.forEach(function (n) { if (n.color === oldValue) n.color = clash.value; });
-        // remove the old target entry
-        colorOptions = colorOptions.filter(c => c !== target);
-      } else {
-        target.label = label;
-        target.value = value;
-        // update nodes if the hex value changed
-        nodes.forEach(function (n) { if (n.color === oldValue) n.color = value; });
-      }
+      // update nodes that used old colour value
+      nodes.forEach(function (n) {
+        if (n.color === oldValue) n.color = value;
+      });
     }
 
-    editingColorValue = null; // done editing
+    editingColorValue = null; // stop editing
   } else {
-    // add / update by value
+    // add new, or update by colour value if it already exists
     var existing = colorOptions.find(function (c) {
       return c.value.toLowerCase() === value.toLowerCase();
     });
-    if (existing) existing.label = label;
-    else colorOptions.push({ label, value });
+    if (existing) {
+      existing.label = label;
+    } else {
+      colorOptions.push({ label: label, value: value });
+    }
   }
 
   labelInput.value = "";
   updateAllViews();
 }
 
-
-// When importing CSV, we may see colour values that aren't in colorOptions yet.
-// Build default labels like "Colour 1", "Colour 2", ...
 function rebuildColorOptionsFromNodes() {
   var seen = {};
   nodes.forEach(function (n) {
-    if (n.color) {
-      seen[n.color] = true;
-    }
+    if (n.color) seen[n.color] = true;
   });
 
   colorOptions = [];
   var index = 1;
   for (var value in seen) {
     if (!seen.hasOwnProperty(value)) continue;
-    colorOptions.push({
-      label: "Colour " + index,
-      value: value
-    });
+    colorOptions.push({ label: "Colour " + index, value: value });
     index++;
   }
 
-  editingColorIndex = -1;
+  editingColorValue = null;
   refreshColorSelect();
   renderColorOptionsList();
 }
@@ -1391,7 +1387,7 @@ function uploadCsv(file) {
 	      return o.label && o.value;
 	    });
 	
-	  editingColorIndex = -1;
+	  
 	} else {
 	  // Fallback for older CSVs
 	  rebuildColorOptionsFromNodes();
