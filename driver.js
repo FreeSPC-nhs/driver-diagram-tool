@@ -11,6 +11,7 @@ var columnTitles = {
   secondary: "Secondary drivers",
   change: "Change ideas"
 };
+var editingColorValue = null; // e.g. "#ffc281"
 
 
 
@@ -165,7 +166,7 @@ function renderColorOptionsList() {
       var valueInput = document.getElementById("colorValueInput");
       if (!labelInput || !valueInput) return;
 
-      editingColorIndex = index;
+      editingColorValue = opt.value;
       labelInput.value = opt.label;
       valueInput.value = opt.value;
       renderColorOptionsList();
@@ -182,43 +183,56 @@ function addColorOptionFromForm() {
 
   var label = (labelInput.value || "").trim();
   var value = (valueInput.value || "").trim();
+  if (!value) { alert("Please choose a colour value."); return; }
 
-  if (!value) {
-    alert("Please choose a colour value.");
-    return;
-  }
+  var isEditing = !!editingColorValue;
 
-  var isEditing = (editingColorIndex >= 0 && editingColorIndex < colorOptions.length);
-
-  // ✅ Only auto-name when adding a NEW colour
+  // only auto-name when adding new
   if (!label) {
-    if (isEditing) {
-      label = colorOptions[editingColorIndex].label; // keep existing name
-    } else {
-      label = "Colour " + (colorOptions.length + 1);
-    }
+    label = isEditing
+      ? (colorOptions.find(c => c.value === editingColorValue)?.label || "")
+      : "Colour " + (colorOptions.length + 1);
   }
 
   if (isEditing) {
-    var oldValue = colorOptions[editingColorIndex].value;
-    colorOptions[editingColorIndex].label = label;
-    colorOptions[editingColorIndex].value = value;
+    var oldValue = editingColorValue;
 
-    // Update any nodes using the old colour value (nodes store hex values)
-    nodes.forEach(function (n) {
-      if (n.color === oldValue) n.color = value;
+    // find the option we meant to edit (by old value)
+    var target = colorOptions.find(function (c) {
+      return c.value.toLowerCase() === oldValue.toLowerCase();
     });
 
-    editingColorIndex = -1;
+    if (!target) {
+      // if it vanished somehow, fall back to "add"
+      colorOptions.push({ label, value });
+    } else {
+      // prevent clashes: if user changed value to one that already exists, merge
+      var clash = colorOptions.find(function (c) {
+        return c !== target && c.value.toLowerCase() === value.toLowerCase();
+      });
+
+      if (clash) {
+        clash.label = label;
+        // move all nodes from oldValue to clash.value
+        nodes.forEach(function (n) { if (n.color === oldValue) n.color = clash.value; });
+        // remove the old target entry
+        colorOptions = colorOptions.filter(c => c !== target);
+      } else {
+        target.label = label;
+        target.value = value;
+        // update nodes if the hex value changed
+        nodes.forEach(function (n) { if (n.color === oldValue) n.color = value; });
+      }
+    }
+
+    editingColorValue = null; // done editing
   } else {
+    // add / update by value
     var existing = colorOptions.find(function (c) {
       return c.value.toLowerCase() === value.toLowerCase();
     });
-    if (existing) {
-      existing.label = label;
-    } else {
-      colorOptions.push({ label: label, value: value });
-    }
+    if (existing) existing.label = label;
+    else colorOptions.push({ label, value });
   }
 
   labelInput.value = "";
