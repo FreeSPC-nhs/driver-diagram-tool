@@ -188,6 +188,7 @@ function renderColorOptionsList() {
     li.style.display = "flex";
     li.style.alignItems = "center";
     li.style.gap = "0.5rem";
+    li.style.padding = "3px 0"; 
 
     var textSpan = document.createElement("span");
     textSpan.textContent = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
@@ -207,7 +208,8 @@ function renderColorOptionsList() {
     delBtn.type = "button";
     delBtn.textContent = "×"; // better centring than "X"
     delBtn.title = "Delete this colour";
-    delBtn.style.marginLeft = "auto";
+    delBtn.style.margin = "2px 0 2px auto";   // top right bottom left
+
 
     delBtn.style.width = "18px";
     delBtn.style.height = "18px";
