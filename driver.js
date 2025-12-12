@@ -205,7 +205,7 @@ function renderColorOptionsList() {
     // delete button (×)
     var delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.textContent = "×";
+    delBtn.textContent = "X";
     delBtn.title = "Delete this colour";
     delBtn.style.marginLeft = "auto";
     delBtn.style.padding = "0.05rem 0.35rem";
