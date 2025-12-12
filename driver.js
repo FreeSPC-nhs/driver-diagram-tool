@@ -5,6 +5,13 @@ var nodes = [];
 var nextId = 1;
 var connections = [];
 var legendVisible = true;
+var columnTitles = {
+  aim: "Aim",
+  primary: "Primary drivers",
+  secondary: "Secondary drivers",
+  change: "Change ideas"
+};
+
 
 
 // Diagram appearance settings (defaults)
@@ -338,12 +345,7 @@ function renderDiagram() {
   columnsContainer.innerHTML = "";
 
   var levels = levelOrder.slice();
-  var levelTitles = {
-    aim: "Aim",
-    primary: "Primary drivers",
-    secondary: "Secondary drivers",
-    change: "Change ideas"
-  };
+  
 
   // Group nodes by level
   var byLevel = {};
@@ -363,7 +365,27 @@ function renderDiagram() {
 
     var title = document.createElement("div");
     title.className = "diagram-column-title";
-    title.textContent = levelTitles[level];
+    title.textContent = columnTitles[level] || "";
+title.title = "Click to edit this heading";
+title.style.cursor = "pointer";
+title.tabIndex = 0;
+
+title.addEventListener("click", function (e) {
+  e.stopPropagation();
+  var current = columnTitles[level] || "";
+  var next = window.prompt("Edit heading:", current);
+  if (next === null) return;
+  columnTitles[level] = next.trim() || current;
+  updateAllViews();
+});
+
+// optional: Enter key edits too
+title.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    title.click();
+  }
+});
     col.appendChild(title);
 
     var stack = document.createElement("div");
@@ -749,19 +771,25 @@ function renderNodesTable() {
 }
 
 function setupCollapsibleSections() {
-  var headers = document.querySelectorAll(".collapsible-header");
-  headers.forEach(function (header) {
-    var targetId = header.dataset.target;
-    var section = targetId ? document.getElementById(targetId) : null;
-    var indicator = header.querySelector(".collapsible-indicator");
+  var panel = document.getElementById("controlsPanel");
+  if (!panel) return;
+
+  panel.addEventListener("click", function (e) {
+    var header = e.target.closest && e.target.closest(".collapsible-header");
+    if (!header) return;
+
+    var targetId = header.getAttribute("data-target");
+    if (!targetId) return;
+
+    var section = document.getElementById(targetId);
     if (!section) return;
 
-    header.addEventListener("click", function () {
-      var collapsed = section.classList.toggle("is-collapsed");
-      if (indicator) {
-        indicator.textContent = collapsed ? "▸" : "▾";
-      }
-    });
+    var indicator = header.querySelector(".collapsible-indicator");
+    var collapsed = section.classList.toggle("is-collapsed");
+
+    if (indicator) {
+      indicator.textContent = collapsed ? "▸" : "▾";
+    }
   });
 }
 
@@ -1088,6 +1116,25 @@ function addChildForNode(nodeId) {
 
 }
 
+function ensureDefaultAim() {
+  var hasAim = nodes.some(function (n) {
+    return n.level === "aim";
+  });
+  if (hasAim) return;
+
+  var aimNode = createNode({
+    level: "aim",
+    text: "Aim",     // you can change to "Click to edit…" if you prefer
+    parentId: "",
+    color: ""
+  });
+
+  nodes.push(aimNode);
+  updateNextIdFromNodes();
+}
+
+
+
 /* ---------- Clear / delete ---------- */
 
 function clearAllNodes() {
@@ -1095,6 +1142,7 @@ function clearAllNodes() {
   nodes = [];
   connections = [];
   updateNextIdFromNodes();
+  ensureDefaultAim();
   updateAllViews();
 }
 
@@ -1130,6 +1178,7 @@ function deleteNode(id) {
   });
 
   updateNextIdFromNodes();
+  ensureDefaultAim();
   updateAllViews();
 
 }
@@ -1167,7 +1216,11 @@ function downloadCsv() {
       vertical_gap: diagramAppearance.verticalGap,
       font_size: diagramAppearance.fontSize,
       font_family: diagramAppearance.fontFamily || "",
-      font_bold: diagramAppearance.fontBold ? "1" : "0"
+      font_bold: diagramAppearance.fontBold ? "1" : "0",
+	title_aim: columnTitles.aim,
+	title_primary: columnTitles.primary,
+	title_secondary: columnTitles.secondary,
+	title_change: columnTitles.change
     };
   });
 
@@ -1200,6 +1253,8 @@ function uploadCsv(file) {
       var imported = [];
       var extraConnectionsRaw = []; // { childId, parents[] }
       var appearanceFromCsv = null;
+	var titlesFromCsv = null;
+
 
       rows.forEach(function (row, index) {
         var id = (row.id || "").toString().trim();
@@ -1238,6 +1293,19 @@ function uploadCsv(file) {
             extraConnectionsRaw.push({ childId: id, parents: parents });
           }
         }
+
+	if (!titlesFromCsv) {
+  	var ta = (row.title_aim || "").toString().trim();
+  	var tp = (row.title_primary || "").toString().trim();
+  	var ts = (row.title_secondary || "").toString().trim();
+  	var tc = (row.title_change || "").toString().trim();
+
+  	var hasAnyTitle = ta || tp || ts || tc;
+  	if (hasAnyTitle) {
+  	  titlesFromCsv = { aim: ta, primary: tp, secondary: ts, change: tc };
+ 	 }
+	}
+
 
         // --- NEW: appearance settings (read once, from first row that has them) ---
         if (!appearanceFromCsv) {
@@ -1301,6 +1369,14 @@ function uploadCsv(file) {
         diagramAppearance.fontBold = appearanceFromCsv.fontBold;
         setAppearanceInputsFromConfig();
       }
+
+	if (titlesFromCsv) {
+	  if (titlesFromCsv.aim) columnTitles.aim = titlesFromCsv.aim;
+	  if (titlesFromCsv.primary) columnTitles.primary = titlesFromCsv.primary;
+	  if (titlesFromCsv.secondary) columnTitles.secondary = titlesFromCsv.secondary;
+	  if (titlesFromCsv.change) columnTitles.change = titlesFromCsv.change;
+	}
+
 
       updateAllViews();
       alert("Loaded " + nodes.length + " items from CSV.");
@@ -1639,7 +1715,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Set up collapsible sections in controls panel
   setupCollapsibleSections();
- 
+
+// Ensure an Aim box exists on first load
+ensureDefaultAim(); 
+
 // Initial render (using default appearance)
   applyDiagramAppearanceFromInputs();
   setAppearanceInputsFromConfig();

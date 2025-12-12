@@ -444,53 +444,10 @@
   <main>
     <!-- Left column: data entry + CSV + colours -->
     <section class="card" id="controlsPanel">
-  <!-- Add items -->
-  <h2 class="collapsible-header" data-target="sectionAddItems">
-    <span>1. Add items</span>
-    <span class="collapsible-indicator">▾</span>
-  </h2>
-  <div id="sectionAddItems" class="collapsible-section">
-    <label for="nodeText">Text</label>
-    <textarea id="nodeText" placeholder="e.g. Reduce unplanned readmissions by 20% in 12 months"></textarea>
-
-    <label for="nodeLevel">Level</label>
-    <select id="nodeLevel">
-      <option value="aim">Aim</option>
-      <option value="primary">Primary driver</option>
-      <option value="secondary">Secondary driver</option>
-      <option value="change">Change idea</option>
-    </select>
-
-    <label for="nodeParent">Parent (optional)</label>
-    <select id="nodeParent">
-      <option value="">— None / top level —</option>
-    </select>
-    <p class="small">
-      Typically the <strong>aim</strong> is at the centre, primary drivers connect to
-      the aim, secondary drivers to a primary driver, and change ideas to a
-      secondary (or primary) driver.
-    </p>
-
-    <label for="nodeColor">Colour (optional)</label>
-    <select id="nodeColor">
-      <option value="">No colour</option>
-    </select>
-    <p class="small">
-      Colour options are defined below (e.g. “Primary 1”, “High impact”). If no colour is chosen,
-      boxes will be white.
-    </p>
-
-    <div class="buttons">
-      <button id="addNodeBtn">Add item</button>
-      <button id="clearAllBtn" class="danger">Clear all</button>
-    </div>
-
-    <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;" />
-  </div>
-
+ 
   <!-- Import / export -->
   <h2 class="collapsible-header" data-target="sectionImportExport">
-    <span>2. Import / export</span>
+    <span>1. Import / export</span>
     <span class="collapsible-indicator">▾</span>
   </h2>
   <div id="sectionImportExport" class="collapsible-section">
@@ -513,7 +470,7 @@
 
   <!-- Colour options -->
   <h2 class="collapsible-header" data-target="sectionColourOptions">
-    <span>3. Colour options</span>
+    <span>2. Colour options</span>
     <span class="collapsible-indicator">▾</span>
   </h2>
   <div id="sectionColourOptions" class="collapsible-section">
@@ -538,7 +495,7 @@
 
 <!-- Diagram appearance -->
   <h2 class="collapsible-header" data-target="sectionAppearance">
-    <span>4. Diagram appearance</span>
+    <span>3. Diagram appearance</span>
     <span class="collapsible-indicator">▾</span>
   </h2>
   <div id="sectionAppearance" class="collapsible-section">
