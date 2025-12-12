@@ -11,7 +11,6 @@ var columnTitles = {
   secondary: "Secondary drivers",
   change: "Change ideas"
 };
-var editingColorValue = null; // e.g. "#ffc281"
 
 
 
@@ -24,9 +23,6 @@ var diagramAppearance = {
   fontBold: false
 };
 
-
-// Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
-var colorOptions = [];
 
 // View state
 var controlsVisible = true;
@@ -104,7 +100,11 @@ function getLevelLabel(level) {
 
 /* ---------- Colour helpers ---------- */
 
-var editingColorValue = null; // value (hex) of the colour currently being edited
+// Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
+var colorOptions = [];
+
+// Track which colour is being edited using a stable key (the hex value), not an array index
+var editingColorValue = null;
 
 function refreshColorSelect() {
   var select = document.getElementById("nodeColor");
@@ -136,6 +136,38 @@ function refreshColorSelect() {
   }
 }
 
+function deleteColorOptionByValue(value) {
+  if (!value) return;
+
+  var opt = colorOptions.find(function (c) {
+    return (c.value || "").toLowerCase() === value.toLowerCase();
+  });
+  if (!opt) return;
+
+  if (!window.confirm('Delete colour "' + opt.label + '"?')) return;
+
+  // Remove from palette
+  colorOptions = colorOptions.filter(function (c) {
+    return (c.value || "").toLowerCase() !== value.toLowerCase();
+  });
+
+  // Remove from any nodes using it
+  nodes.forEach(function (n) {
+    if ((n.color || "").toLowerCase() === value.toLowerCase()) {
+      n.color = "";
+    }
+  });
+
+  // Stop editing if we deleted the one being edited
+  if (editingColorValue && editingColorValue.toLowerCase() === value.toLowerCase()) {
+    editingColorValue = null;
+    var labelInput = document.getElementById("colorLabelInput");
+    if (labelInput) labelInput.value = "";
+  }
+
+  updateAllViews();
+}
+
 function renderColorOptionsList() {
   var list = document.getElementById("colorOptionsList");
   if (!list) return;
@@ -153,21 +185,47 @@ function renderColorOptionsList() {
     var li = document.createElement("li");
     li.style.cursor = "pointer";
     li.title = "Click to edit this colour";
+    li.style.display = "flex";
+    li.style.alignItems = "center";
+    li.style.gap = "0.5rem";
 
-    li.textContent = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
+    var textSpan = document.createElement("span");
+    textSpan.textContent = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
+    li.appendChild(textSpan);
 
     // underline the one we're editing
-    if (editingColorValue && opt.value.toLowerCase() === editingColorValue.toLowerCase()) {
+    if (
+      editingColorValue &&
+      (opt.value || "").toLowerCase() === editingColorValue.toLowerCase()
+    ) {
       li.style.fontWeight = "600";
       li.style.textDecoration = "underline";
     }
+
+    // delete button (×)
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.textContent = "×";
+    delBtn.title = "Delete this colour";
+    delBtn.style.marginLeft = "auto";
+    delBtn.style.padding = "0.05rem 0.35rem";
+    delBtn.style.fontSize = "0.9rem";
+    delBtn.style.lineHeight = "1";
+    delBtn.style.cursor = "pointer";
+
+    delBtn.addEventListener("click", function (e) {
+      e.stopPropagation(); // don't trigger edit
+      deleteColorOptionByValue(opt.value);
+    });
+
+    li.appendChild(delBtn);
 
     li.addEventListener("click", function () {
       var labelInput = document.getElementById("colorLabelInput");
       var valueInput = document.getElementById("colorValueInput");
       if (!labelInput || !valueInput) return;
 
-      editingColorValue = opt.value;   // <-- THIS is the edit marker
+      editingColorValue = opt.value;
       labelInput.value = opt.label;
       valueInput.value = opt.value;
 
@@ -193,16 +251,15 @@ function addColorOptionFromForm() {
 
   var isEditing = !!editingColorValue;
 
-  // Only auto-name when adding (not when editing)
+  // Only auto-name when adding new (not when editing)
   if (!label) {
-    if (!isEditing) {
-      label = "Colour " + (colorOptions.length + 1);
-    } else {
-      // keep existing label if user erased it
+    if (isEditing) {
       var existingLabel = colorOptions.find(function (c) {
-        return c.value.toLowerCase() === editingColorValue.toLowerCase();
+        return (c.value || "").toLowerCase() === editingColorValue.toLowerCase();
       });
       label = existingLabel ? existingLabel.label : "";
+    } else {
+      label = "Colour " + (colorOptions.length + 1);
     }
   }
 
@@ -210,7 +267,7 @@ function addColorOptionFromForm() {
     var oldValue = editingColorValue;
 
     var target = colorOptions.find(function (c) {
-      return c.value.toLowerCase() === oldValue.toLowerCase();
+      return (c.value || "").toLowerCase() === oldValue.toLowerCase();
     });
 
     if (!target) {
@@ -230,7 +287,7 @@ function addColorOptionFromForm() {
   } else {
     // add new, or update by colour value if it already exists
     var existing = colorOptions.find(function (c) {
-      return c.value.toLowerCase() === value.toLowerCase();
+      return (c.value || "").toLowerCase() === value.toLowerCase();
     });
     if (existing) {
       existing.label = label;
@@ -243,17 +300,24 @@ function addColorOptionFromForm() {
   updateAllViews();
 }
 
+// When importing CSV, we may see colour values that aren't in colorOptions yet.
+// Build default labels like "Colour 1", "Colour 2", ...
 function rebuildColorOptionsFromNodes() {
   var seen = {};
   nodes.forEach(function (n) {
-    if (n.color) seen[n.color] = true;
+    if (n.color) {
+      seen[n.color] = true;
+    }
   });
 
   colorOptions = [];
   var index = 1;
   for (var value in seen) {
     if (!seen.hasOwnProperty(value)) continue;
-    colorOptions.push({ label: "Colour " + index, value: value });
+    colorOptions.push({
+      label: "Colour " + index,
+      value: value
+    });
     index++;
   }
 
@@ -261,6 +325,40 @@ function rebuildColorOptionsFromNodes() {
   refreshColorSelect();
   renderColorOptionsList();
 }
+
+function deleteColorOptionByValue(value) {
+  if (!value) return;
+
+  var opt = colorOptions.find(function (c) {
+    return c.value.toLowerCase() === value.toLowerCase();
+  });
+  if (!opt) return;
+
+  if (!window.confirm('Delete colour "' + opt.label + '"?')) return;
+
+  // remove from palette
+  colorOptions = colorOptions.filter(function (c) {
+    return c.value.toLowerCase() !== value.toLowerCase();
+  });
+
+  // remove from any nodes using it
+  nodes.forEach(function (n) {
+    if ((n.color || "").toLowerCase() === value.toLowerCase()) {
+      n.color = "";
+    }
+  });
+
+  // stop editing if we deleted the one being edited
+  if (editingColorValue && editingColorValue.toLowerCase() === value.toLowerCase()) {
+    editingColorValue = null;
+    var labelInput = document.getElementById("colorLabelInput");
+    if (labelInput) labelInput.value = "";
+  }
+
+  updateAllViews();
+}
+
+
 
 // Convert hex colour to { r, g, b }
 function hexToRgb(hex) {
@@ -1160,12 +1258,25 @@ function ensureDefaultAim() {
 
 function clearAllNodes() {
   if (!window.confirm("Clear all items from this driver diagram?")) return;
+
   nodes = [];
   connections = [];
+
+  // Clear palette too
+  colorOptions = [];
+  editingColorValue = null;
+
+  // Clear colour form inputs
+  var labelInput = document.getElementById("colorLabelInput");
+  var valueInput = document.getElementById("colorValueInput");
+  if (labelInput) labelInput.value = "";
+  if (valueInput) valueInput.value = "#fff7cc";
+
   updateNextIdFromNodes();
   ensureDefaultAim();
   updateAllViews();
 }
+
 
 function deleteNode(id) {
   var toDelete = new Set([id]);
