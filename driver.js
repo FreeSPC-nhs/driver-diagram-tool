@@ -187,26 +187,30 @@ function addColorOptionFromForm() {
     alert("Please choose a colour value.");
     return;
   }
+
+  var isEditing = (editingColorIndex >= 0 && editingColorIndex < colorOptions.length);
+
+  // ✅ Only auto-name when adding a NEW colour
   if (!label) {
-    label = "Colour " + (colorOptions.length + 1);
+    if (isEditing) {
+      label = colorOptions[editingColorIndex].label; // keep existing name
+    } else {
+      label = "Colour " + (colorOptions.length + 1);
+    }
   }
 
-  if (editingColorIndex >= 0 && editingColorIndex < colorOptions.length) {
-    // Editing existing colour option
+  if (isEditing) {
     var oldValue = colorOptions[editingColorIndex].value;
     colorOptions[editingColorIndex].label = label;
     colorOptions[editingColorIndex].value = value;
 
-    // Update any nodes using the old colour value
+    // Update any nodes using the old colour value (nodes store hex values)
     nodes.forEach(function (n) {
-      if (n.color === oldValue) {
-        n.color = value;
-      }
+      if (n.color === oldValue) n.color = value;
     });
 
     editingColorIndex = -1;
   } else {
-    // Creating / updating by colour value
     var existing = colorOptions.find(function (c) {
       return c.value.toLowerCase() === value.toLowerCase();
     });
@@ -218,10 +222,9 @@ function addColorOptionFromForm() {
   }
 
   labelInput.value = "";
-  // keep the last chosen colour in the colour picker
-
   updateAllViews();
 }
+
 
 // When importing CSV, we may see colour values that aren't in colorOptions yet.
 // Build default labels like "Colour 1", "Colour 2", ...
@@ -1374,7 +1377,7 @@ function uploadCsv(file) {
 	      return o.label && o.value;
 	    });
 	
-	  editingColorIndex = null;
+	  editingColorIndex = -1;
 	} else {
 	  // Fallback for older CSVs
 	  rebuildColorOptionsFromNodes();
