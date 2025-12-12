@@ -325,7 +325,7 @@ function renderLegend() {
     swatch.style.backgroundColor = opt.value;
 
     var labelSpan = document.createElement("span");
-    labelSpan.textContent = opt.label + " (" + opt.value + ")";
+    labelSpan.textContent = opt.label;
 
     li.appendChild(swatch);
     li.appendChild(labelSpan);
@@ -774,24 +774,32 @@ function setupCollapsibleSections() {
   var panel = document.getElementById("controlsPanel");
   if (!panel) return;
 
-  panel.addEventListener("click", function (e) {
-    var header = e.target.closest && e.target.closest(".collapsible-header");
-    if (!header) return;
+  // prevent double-binding if called more than once
+  if (panel._collapsibleBound) return;
+  panel._collapsibleBound = true;
 
-    var targetId = header.getAttribute("data-target");
+  panel.addEventListener("click", function (e) {
+    var el = e.target;
+
+    // Walk up the DOM until we hit a collapsible header or the panel
+    while (el && el !== panel) {
+      if (el.classList && el.classList.contains("collapsible-header")) break;
+      el = el.parentNode;
+    }
+    if (!el || el === panel) return;
+
+    var targetId = el.getAttribute("data-target");
     if (!targetId) return;
 
     var section = document.getElementById(targetId);
     if (!section) return;
 
-    var indicator = header.querySelector(".collapsible-indicator");
+    var indicator = el.querySelector(".collapsible-indicator");
     var collapsed = section.classList.toggle("is-collapsed");
-
-    if (indicator) {
-      indicator.textContent = collapsed ? "▸" : "▾";
-    }
+    if (indicator) indicator.textContent = collapsed ? "▸" : "▾";
   });
 }
+
 
 function applyDiagramAppearanceFromInputs() {
   var hInput = document.getElementById("boxHeightInput");
@@ -1220,7 +1228,9 @@ function downloadCsv() {
 	title_aim: columnTitles.aim,
 	title_primary: columnTitles.primary,
 	title_secondary: columnTitles.secondary,
-	title_change: columnTitles.change
+	title_change: columnTitles.change,
+	palette_json: JSON.stringify(colorOptions || [])
+
     };
   });
 
@@ -1254,6 +1264,7 @@ function uploadCsv(file) {
       var extraConnectionsRaw = []; // { childId, parents[] }
       var appearanceFromCsv = null;
 	var titlesFromCsv = null;
+	var paletteFromCsv = null;
 
 
       rows.forEach(function (row, index) {
@@ -1293,6 +1304,19 @@ function uploadCsv(file) {
             extraConnectionsRaw.push({ childId: id, parents: parents });
           }
         }
+
+	if (!paletteFromCsv) {
+	  var rawPalette = (row.palette_json || "").toString().trim();
+	  if (rawPalette) {
+	    try {
+	      var parsed = JSON.parse(rawPalette);
+	      if (Array.isArray(parsed)) paletteFromCsv = parsed;
+	    } catch (e) {
+	      console.warn("Could not parse palette_json:", e);
+	    }
+	  }
+	}
+
 
 	if (!titlesFromCsv) {
   	var ta = (row.title_aim || "").toString().trim();
@@ -1337,7 +1361,25 @@ function uploadCsv(file) {
 
       nodes = imported;
       updateNextIdFromNodes();
-      rebuildColorOptionsFromNodes();
+      if (paletteFromCsv && paletteFromCsv.length) {
+	  // Use saved palette (keeps colour names)
+	  colorOptions = paletteFromCsv
+	    .map(function (o) {
+	      return {
+	        label: (o.label || "").toString().trim(),
+	        value: (o.value || "").toString().trim()
+	      };
+	    })
+	    .filter(function (o) {
+	      return o.label && o.value;
+	    });
+	
+	  editingColorIndex = null;
+	} else {
+	  // Fallback for older CSVs
+	  rebuildColorOptionsFromNodes();
+	}
+
 
       // First, rebuild baseline connections from primary parent_id
       rebuildConnectionsFromParents();
@@ -1376,6 +1418,9 @@ function uploadCsv(file) {
 	  if (titlesFromCsv.secondary) columnTitles.secondary = titlesFromCsv.secondary;
 	  if (titlesFromCsv.change) columnTitles.change = titlesFromCsv.change;
 	}
+
+	renderColorOptionsList();
+	renderLegend();
 
 
       updateAllViews();
