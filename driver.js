@@ -205,13 +205,25 @@ function renderColorOptionsList() {
     // delete button (×)
     var delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.textContent = "X";
+    delBtn.textContent = "×"; // better centring than "X"
     delBtn.title = "Delete this colour";
     delBtn.style.marginLeft = "auto";
-    delBtn.style.padding = "0.05rem 0.35rem";
-    delBtn.style.fontSize = "0.9rem";
+
+    delBtn.style.width = "18px";
+    delBtn.style.height = "18px";
+   
+    delBtn.style.display = "inline-flex";
+    delBtn.style.alignItems = "center";
+    delBtn.style.justifyContent = "center";
+
+    delBtn.style.padding = "0";
+    delBtn.style.fontSize = "12px";
     delBtn.style.lineHeight = "1";
     delBtn.style.cursor = "pointer";
+    delBtn.style.borderRadius = "4px";
+    delBtn.style.fontWeight = "bold";
+
+
 
     delBtn.addEventListener("click", function (e) {
       e.stopPropagation(); // don't trigger edit
