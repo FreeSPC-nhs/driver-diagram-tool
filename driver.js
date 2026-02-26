@@ -460,6 +460,124 @@ function renderLegend() {
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
 
+function computeTreeLayout(byLevel, boxH, gap) {
+  var aimNodes = byLevel.aim || [];
+  var primaryNodes = byLevel.primary || [];
+  var secondaryNodes = byLevel.secondary || [];
+  var changeNodes = byLevel.change || [];
+
+  // Build children maps in the CURRENT order of arrays (important)
+  var secondariesByPrimary = {};
+  secondaryNodes.forEach(function (s) {
+    var pid = s.parentId || "";
+    if (!secondariesByPrimary[pid]) secondariesByPrimary[pid] = [];
+    secondariesByPrimary[pid].push(s);
+  });
+
+  var changesBySecondary = {};
+  changeNodes.forEach(function (c) {
+    var sid = c.parentId || "";
+    if (!changesBySecondary[sid]) changesBySecondary[sid] = [];
+    changesBySecondary[sid].push(c);
+  });
+
+  // Height required for a secondary branch (secondary + its changes)
+  function secondaryBranchHeight(secId) {
+    var kids = changesBySecondary[secId] || [];
+    if (kids.length <= 1) return boxH;
+    return Math.max(boxH, kids.length * boxH + (kids.length - 1) * gap);
+  }
+
+  // Height required for a primary branch (primary + all its secondary branches)
+  function primaryBranchHeight(primaryId) {
+    var secs = secondariesByPrimary[primaryId] || [];
+    if (secs.length === 0) return boxH;
+
+    var sum = 0;
+    secs.forEach(function (sec, i) {
+      sum += secondaryBranchHeight(sec.id);
+      if (i < secs.length - 1) sum += gap; // gap between secondary groups
+    });
+
+    return Math.max(boxH, sum);
+  }
+
+  // Compute overall diagram height by stacking primary branches
+  var totalHeight = 0;
+  if (primaryNodes.length === 0) {
+    totalHeight = boxH;
+  } else {
+    primaryNodes.forEach(function (p, i) {
+      totalHeight += primaryBranchHeight(p.id);
+      if (i < primaryNodes.length - 1) totalHeight += gap; // gap between primary groups
+    });
+  }
+
+  // Positions (top offsets) per node
+  var topById = {};
+
+  // Place Aim in the middle of the total height (if it exists)
+  if (aimNodes.length) {
+    topById[aimNodes[0].id] = Math.max(0, (totalHeight - boxH) / 2);
+  }
+
+  // Lay out primaries, and within each primary lay out its secondaries and changes
+  var cursorY = 0;
+
+  primaryNodes.forEach(function (p, pIndex) {
+    var pHeight = primaryBranchHeight(p.id);
+
+    // Primary box centred within its branch block
+    topById[p.id] = cursorY + (pHeight - boxH) / 2;
+
+    // Secondary blocks stacked within this primary block
+    var secCursorY = cursorY;
+    var secs = secondariesByPrimary[p.id] || [];
+
+    secs.forEach(function (sec, sIndex) {
+      var secH = secondaryBranchHeight(sec.id);
+
+      // Secondary box centred within its own block
+      topById[sec.id] = secCursorY + (secH - boxH) / 2;
+
+      // Change ideas stacked within the secondary block, starting at the top of the block
+      var changes = changesBySecondary[sec.id] || [];
+      var chCursorY = secCursorY;
+      changes.forEach(function (ch, chIndex) {
+        topById[ch.id] = chCursorY;
+        chCursorY += boxH + gap;
+      });
+
+      secCursorY += secH;
+      if (sIndex < secs.length - 1) secCursorY += gap;
+    });
+
+    cursorY += pHeight;
+    if (pIndex < primaryNodes.length - 1) cursorY += gap;
+  });
+
+  // Any unparented secondaries/changes (rare) — just place them at the bottom
+  // so they remain visible rather than overlapping at 0.
+  var fallbackY = totalHeight + gap;
+  secondaryNodes.forEach(function (s) {
+    if (topById[s.id] == null) {
+      topById[s.id] = fallbackY;
+      fallbackY += boxH + gap;
+    }
+  });
+  changeNodes.forEach(function (c) {
+    if (topById[c.id] == null) {
+      topById[c.id] = fallbackY;
+      fallbackY += boxH + gap;
+    }
+  });
+
+  // If we used fallback rows, extend total height
+  totalHeight = Math.max(totalHeight, fallbackY);
+
+  return { topById: topById, totalHeight: totalHeight };
+}
+
 function renderDiagram() {
   var canvas = document.getElementById("diagramCanvas");
   var columnsContainer = document.getElementById("diagramColumns");
@@ -479,6 +597,15 @@ function renderDiagram() {
       return n.level === level;
     });
   });
+
+// --- NEW: compute a tree-style layout so branches stay aligned ---
+var boxH = (diagramAppearance && diagramAppearance.boxHeight) ? diagramAppearance.boxHeight : 32;
+var gap = (diagramAppearance && diagramAppearance.verticalGap != null) ? diagramAppearance.verticalGap : 8;
+
+var layout = computeTreeLayout(byLevel, boxH, gap);
+
+// Make sure the canvas is tall enough to contain absolutely-positioned nodes
+canvas.style.minHeight = Math.ceil(layout.totalHeight + gap * 2) + "px";
 
 // --- NEW: Keep change ideas visually aligned with their parent secondary driver ---
 // Build a stable "node order" index (current order in the nodes array)
@@ -548,27 +675,26 @@ title.addEventListener("keydown", function (e) {
     stack.className = "diagram-column-stack";
     col.appendChild(stack);
     
-    // Vertical distribution per column
-    if (level === "aim" && byLevel[level].length === 1) {
-      stack.style.justifyContent = "center";
-    } else {
-      stack.style.justifyContent = "space-evenly";
-    }
-
-    // Use verticalGap as padding at top/bottom of the stack
-    if (diagramAppearance) {
-      var pad = (diagramAppearance.verticalGap || 0) / 2;
-      stack.style.paddingTop = pad + "px";
-      stack.style.paddingBottom = pad + "px";
-    }
+    // --- NEW: tree layout uses absolute positioning, not flex distribution ---
+stack.style.justifyContent = "flex-start";
+stack.style.paddingTop = "0px";
+stack.style.paddingBottom = "0px";
+stack.style.position = "relative";
+stack.style.height = Math.ceil(layout.totalHeight) + "px";
 
     byLevel[level].forEach(function (node) {
       var box = document.createElement("div");
       box.className = "diagram-node level-" + level;
       box.setAttribute("data-id", node.id);
+// --- NEW: absolute placement based on computed tree layout ---
+box.style.position = "absolute";
+box.style.top = (layout.topById[node.id] != null ? layout.topById[node.id] : 0) + "px";
+box.style.left = "0px";
+box.style.right = "0px";
 
 	// Apply appearance settings
     if (diagramAppearance) {
+      box.style.height = diagramAppearance.boxHeight + "px";
       box.style.minHeight = diagramAppearance.boxHeight + "px";
       box.style.fontSize = diagramAppearance.fontSize + "px";
       if (diagramAppearance.fontFamily) {
@@ -577,8 +703,7 @@ title.addEventListener("keydown", function (e) {
         box.style.fontFamily = ""; // inherit
       }
       box.style.fontWeight = diagramAppearance.fontBold ? "700" : "400"; 
-      box.style.marginTop = (diagramAppearance.verticalGap / 2) + "px";
-      box.style.marginBottom = (diagramAppearance.verticalGap / 2) + "px";
+
     }
 
       // Apply colour fill if set
