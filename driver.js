@@ -28,6 +28,10 @@ var diagramAppearance = {
 var controlsVisible = true;
 var tableVisible = false;
 
+// --- Right-click context menu state ---
+var nodeContextMenuEl = null;
+var contextNodeId = null;
+
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
 
@@ -686,6 +690,14 @@ stack.style.height = Math.ceil(layout.totalHeight) + "px";
       var box = document.createElement("div");
       box.className = "diagram-node level-" + level;
       box.setAttribute("data-id", node.id);
+
+// Right-click context menu
+box.addEventListener("contextmenu", function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  openNodeContextMenu(node.id, e.clientX, e.clientY);
+});
+
 // --- NEW: absolute placement based on computed tree layout ---
 box.style.position = "absolute";
 box.style.top = (layout.topById[node.id] != null ? layout.topById[node.id] : 0) + "px";
@@ -994,6 +1006,54 @@ function createColorSelectForNode(node) {
   return select;
 }
 
+// --- Manual reordering helpers (reorders within same parentId + same level) ---
+function getSiblingIdsInOrder(node) {
+  var pid = node.parentId || "";
+  var lvl = node.level;
+  return nodes
+    .filter(function (n) { return (n.parentId || "") === pid && n.level === lvl; })
+    .map(function (n) { return n.id; });
+}
+
+function moveNodeWithinSiblings(nodeId, direction) {
+  var node = nodes.find(function (n) { return n.id === nodeId; });
+  if (!node) return;
+
+  var siblings = getSiblingIdsInOrder(node);
+  if (siblings.length <= 1) return;
+
+  var pos = siblings.indexOf(nodeId);
+  if (pos === -1) return;
+
+  var targetPos = pos;
+
+  if (direction === "up") targetPos = Math.max(0, pos - 1);
+  if (direction === "down") targetPos = Math.min(siblings.length - 1, pos + 1);
+  if (direction === "top") targetPos = 0;
+  if (direction === "bottom") targetPos = siblings.length - 1;
+
+  if (targetPos === pos) return;
+
+  var targetId = siblings[targetPos];
+
+  var fromIndex = nodes.findIndex(function (n) { return n.id === nodeId; });
+  var toIndex = nodes.findIndex(function (n) { return n.id === targetId; });
+
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  // Remove the node and insert at the new index.
+  var removed = nodes.splice(fromIndex, 1)[0];
+
+  // If we removed an earlier element, the target index shifts left by 1
+  if (fromIndex < toIndex) toIndex--;
+
+  // Insert BEFORE the target when moving up/top, AFTER when moving down/bottom
+  // (but since targetId is the sibling occupying the destination slot, inserting before it is correct)
+  nodes.splice(toIndex, 0, removed);
+
+  updateAllViews();
+}
+
 function insertAfterLastSibling(nodes, newNode) {
   let insertAt = -1;
 
@@ -1120,6 +1180,7 @@ function setupCollapsibleSections() {
   });
 }
 
+ensureNodeContextMenu();
 
 function applyDiagramAppearanceFromInputs() {
   var hInput = document.getElementById("boxHeightInput");
@@ -2000,7 +2061,129 @@ function closeHelpOverlay() {
   overlay.setAttribute("aria-hidden", "true");
 }
 
+function ensureNodeContextMenu() {
+  if (nodeContextMenuEl) return;
 
+  var menu = document.createElement("div");
+  menu.id = "nodeContextMenu";
+  menu.style.display = "none";
+  menu.style.position = "fixed";
+  menu.style.zIndex = "9999";
+  menu.style.minWidth = "190px";
+  menu.style.background = "#fff";
+  menu.style.border = "1px solid #d0d7de";
+  menu.style.borderRadius = "8px";
+  menu.style.boxShadow = "0 8px 24px rgba(0,0,0,0.14)";
+  menu.style.padding = "6px";
+  menu.style.fontSize = "13px";
+
+  function addItem(label, onClick) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.style.display = "block";
+    btn.style.width = "100%";
+    btn.style.textAlign = "left";
+    btn.style.padding = "8px 10px";
+    btn.style.border = "0";
+    btn.style.background = "transparent";
+    btn.style.cursor = "pointer";
+    btn.style.borderRadius = "6px";
+    btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
+    btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeNodeContextMenu();
+      onClick();
+    });
+    menu.appendChild(btn);
+  }
+
+  function addDivider() {
+    var hr = document.createElement("div");
+    hr.style.height = "1px";
+    hr.style.background = "#eaeef2";
+    hr.style.margin = "6px 0";
+    menu.appendChild(hr);
+  }
+
+  // Build menu items
+  addItem("Edit text…", function () {
+    if (!contextNodeId) return;
+    editNode(contextNodeId);
+  });
+
+  addItem("Change colour", function () {
+    if (!contextNodeId) return;
+    var n = nodes.find(function (x) { return x.id === contextNodeId; });
+    if (n) cycleNodeColor(n);
+  });
+
+  addDivider();
+
+  addItem("Move up", function () {
+    if (!contextNodeId) return;
+    moveNodeWithinSiblings(contextNodeId, "up");
+  });
+  addItem("Move down", function () {
+    if (!contextNodeId) return;
+    moveNodeWithinSiblings(contextNodeId, "down");
+  });
+  addItem("Move to top", function () {
+    if (!contextNodeId) return;
+    moveNodeWithinSiblings(contextNodeId, "top");
+  });
+  addItem("Move to bottom", function () {
+    if (!contextNodeId) return;
+    moveNodeWithinSiblings(contextNodeId, "bottom");
+  });
+
+  addDivider();
+
+  addItem("Delete…", function () {
+    if (!contextNodeId) return;
+    deleteNode(contextNodeId);
+  });
+
+  document.body.appendChild(menu);
+  nodeContextMenuEl = menu;
+
+  // Close on click elsewhere / scroll / resize / escape
+  document.addEventListener("click", closeNodeContextMenu);
+  document.addEventListener("scroll", closeNodeContextMenu, true);
+  window.addEventListener("resize", closeNodeContextMenu);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeNodeContextMenu();
+  });
+}
+
+function openNodeContextMenu(nodeId, clientX, clientY) {
+  ensureNodeContextMenu();
+  contextNodeId = nodeId;
+
+  nodeContextMenuEl.style.display = "block";
+
+  // Clamp to viewport
+  var rect = nodeContextMenuEl.getBoundingClientRect();
+  var x = clientX;
+  var y = clientY;
+
+  var maxX = window.innerWidth - rect.width - 8;
+  var maxY = window.innerHeight - rect.height - 8;
+
+  if (x > maxX) x = maxX;
+  if (y > maxY) y = maxY;
+
+  nodeContextMenuEl.style.left = x + "px";
+  nodeContextMenuEl.style.top = y + "px";
+}
+
+function closeNodeContextMenu() {
+  if (!nodeContextMenuEl) return;
+  nodeContextMenuEl.style.display = "none";
+  contextNodeId = null;
+}
 
 /* ---------- Init ---------- */
 
