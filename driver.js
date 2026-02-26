@@ -480,6 +480,37 @@ function renderDiagram() {
     });
   });
 
+// --- NEW: Keep change ideas visually aligned with their parent secondary driver ---
+// Build a stable "node order" index (current order in the nodes array)
+var nodeIndexById = {};
+nodes.forEach(function (n, i) {
+  nodeIndexById[n.id] = i;
+});
+
+// Build an order index for secondary drivers as they appear in the secondary column
+var secondaryOrderById = {};
+(byLevel.secondary || []).forEach(function (n, i) {
+  secondaryOrderById[n.id] = i;
+});
+
+// Sort change ideas by their parent secondary driver's position.
+// Tie-break within the same parent using the nodes-array order (stable).
+if (byLevel.change && byLevel.change.length) {
+  byLevel.change.sort(function (a, b) {
+    var ai = (a.parentId && secondaryOrderById.hasOwnProperty(a.parentId))
+      ? secondaryOrderById[a.parentId]
+      : 999999;
+    var bi = (b.parentId && secondaryOrderById.hasOwnProperty(b.parentId))
+      ? secondaryOrderById[b.parentId]
+      : 999999;
+
+    if (ai !== bi) return ai - bi;
+
+    // same parent secondary (or both missing): keep insertion order
+    return (nodeIndexById[a.id] || 0) - (nodeIndexById[b.id] || 0);
+  });
+}
+
   // Build columns
   levels.forEach(function (level) {
     var col = document.createElement("div");
@@ -1039,6 +1070,10 @@ if (parentId) {
   nodes.push(node);
 }
 
+// If a parent was chosen, add a connection for it
+if (parentId) {
+  connections.push({ fromId: parentId, toId: node.id });
+}
   textEl.value = "";
   updateAllViews();
 
