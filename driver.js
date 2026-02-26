@@ -823,6 +823,30 @@ function createColorSelectForNode(node) {
   return select;
 }
 
+function insertAfterLastSibling(nodes, newNode) {
+  let insertAt = -1;
+
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.parentId === newNode.parentId && n.level === newNode.level) {
+      insertAt = i;
+    }
+  }
+
+  // If no siblings exist yet, try to insert after the parent itself
+  if (insertAt === -1) {
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].id === newNode.parentId) {
+        insertAt = i;
+        break;
+      }
+    }
+  }
+
+  if (insertAt === -1) nodes.push(newNode);
+  else nodes.splice(insertAt + 1, 0, newNode);
+}
+
 function renderNodesTable() {
   var tableWrapper = document.getElementById("nodesTableWrapper");
   var tbody = document.getElementById("nodesTableBody");
@@ -1002,17 +1026,18 @@ function addNodeFromForm() {
   }
 
     var node = createNode({
-    level: level,
-    text: text,
-    parentId: parentId,
-    color: color
-  });
-  nodes.push(node);
+  level: level,
+  text: text,
+  parentId: parentId,
+  color: color
+});
 
-  // If a parent was chosen, add a connection for it
-  if (parentId) {
-    connections.push({ fromId: parentId, toId: node.id });
-  }
+// If there's a parent, insert after siblings; otherwise append.
+if (parentId) {
+  insertAfterLastSibling(nodes, node);
+} else {
+  nodes.push(node);
+}
 
   textEl.value = "";
   updateAllViews();
@@ -1240,7 +1265,7 @@ function addChildForNode(nodeId) {
     color: refNode.color // inherit colour
   });
 
-    nodes.push(newNode);
+    insertAfterLastSibling(nodes, newNode);
 
   // Record the connection parent -> child
   connections.push({ fromId: refNode.id, toId: newNode.id });
