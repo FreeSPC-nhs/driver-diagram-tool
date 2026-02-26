@@ -26,7 +26,7 @@ var diagramAppearance = {
 
 // View state
 var controlsVisible = true;
-var tableVisible = true;
+var tableVisible = false;
 
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
@@ -697,6 +697,21 @@ title.addEventListener("keydown", function (e) {
         cycleNodeColor(node);
       });
       box.appendChild(badge);
+
+	// Delete button (shown on hover)
+	var del = document.createElement("button");
+	del.type = "button";
+	del.className = "diagram-delete";
+	del.textContent = "×";
+	del.title = "Delete this item";
+	del.setAttribute("aria-label", "Delete " + getLevelLabel(node.level));
+
+	del.addEventListener("click", function (e) {
+	  e.stopPropagation();
+	  deleteNode(node.id);
+	});
+
+	if (node.level !== "aim") box.appendChild(del);
 
       stack.appendChild(box);
     });
@@ -1875,6 +1890,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   var btnToggleControls = document.getElementById("btnToggleControls");
   var btnToggleTable = document.getElementById("btnToggleTable");
+  if (btnToggleTable) btnToggleTable.textContent = "Show table";
   var btnHeaderClear = document.getElementById("btnHeaderClear");
   var btnExportPng = document.getElementById("btnExportPng");
   var btnExportPdf = document.getElementById("btnExportPdf");
