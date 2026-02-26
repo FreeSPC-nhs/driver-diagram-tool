@@ -1180,8 +1180,6 @@ function setupCollapsibleSections() {
   });
 }
 
-ensureNodeContextMenu();
-
 function applyDiagramAppearanceFromInputs() {
   var hInput = document.getElementById("boxHeightInput");
   var gInput = document.getElementById("boxGapInput");
@@ -2076,6 +2074,7 @@ function ensureNodeContextMenu() {
   menu.style.boxShadow = "0 8px 24px rgba(0,0,0,0.14)";
   menu.style.padding = "6px";
   menu.style.fontSize = "13px";
+  menu.style.color = "#111";     // <-- force readable text
 
   function addItem(label, onClick) {
     var btn = document.createElement("button");
@@ -2087,6 +2086,7 @@ function ensureNodeContextMenu() {
     btn.style.padding = "8px 10px";
     btn.style.border = "0";
     btn.style.background = "transparent";
+    btn.style.color = "#111";      // <-- force readable text on the buttons
     btn.style.cursor = "pointer";
     btn.style.borderRadius = "6px";
     btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
@@ -2148,6 +2148,10 @@ function ensureNodeContextMenu() {
 
   document.body.appendChild(menu);
   nodeContextMenuEl = menu;
+
+menu.addEventListener("click", function (e) {
+  e.stopPropagation(); // prevent document click handler from closing it first
+});
 
   // Close on click elsewhere / scroll / resize / escape
   document.addEventListener("click", closeNodeContextMenu);
@@ -2248,7 +2252,7 @@ document.addEventListener("DOMContentLoaded", function () {
   if (btnHelp) {
     btnHelp.addEventListener("click", function () {
       openHelpOverlay();
-    });
+    });	
   }
   if (helpCloseBtn) {
     helpCloseBtn.addEventListener("click", function () {
@@ -2289,5 +2293,7 @@ ensureDefaultAim();
 // Initial render (using default appearance)
   applyDiagramAppearanceFromInputs();
   setAppearanceInputsFromConfig();
+
+ensureNodeContextMenu();
 
 });
