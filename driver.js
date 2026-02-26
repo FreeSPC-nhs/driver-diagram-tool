@@ -1019,38 +1019,49 @@ function moveNodeWithinSiblings(nodeId, direction) {
   var node = nodes.find(function (n) { return n.id === nodeId; });
   if (!node) return;
 
-  var siblings = getSiblingIdsInOrder(node);
-  if (siblings.length <= 1) return;
+  var pid = node.parentId || "";
+  var lvl = node.level;
 
-  var pos = siblings.indexOf(nodeId);
-  if (pos === -1) return;
-
-  var targetPos = pos;
-
-  if (direction === "up") targetPos = Math.max(0, pos - 1);
-  if (direction === "down") targetPos = Math.min(siblings.length - 1, pos + 1);
-  if (direction === "top") targetPos = 0;
-  if (direction === "bottom") targetPos = siblings.length - 1;
-
-  if (targetPos === pos) return;
-
-  var targetId = siblings[targetPos];
+  // Indices of siblings in the nodes[] array, in current order
+  var siblingIndexes = [];
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if ((n.parentId || "") === pid && n.level === lvl) siblingIndexes.push(i);
+  }
+  if (siblingIndexes.length <= 1) return;
 
   var fromIndex = nodes.findIndex(function (n) { return n.id === nodeId; });
-  var toIndex = nodes.findIndex(function (n) { return n.id === targetId; });
+  var sibPos = siblingIndexes.indexOf(fromIndex);
+  if (sibPos === -1) return;
 
-  if (fromIndex === -1 || toIndex === -1) return;
+  var targetSibPos = sibPos;
+  if (direction === "up") targetSibPos = Math.max(0, sibPos - 1);
+  else if (direction === "down") targetSibPos = Math.min(siblingIndexes.length - 1, sibPos + 1);
+  else if (direction === "top") targetSibPos = 0;
+  else if (direction === "bottom") targetSibPos = siblingIndexes.length - 1;
 
-  // Remove the node and insert at the new index.
+  if (targetSibPos === sibPos) return;
+
+  var targetIndex = siblingIndexes[targetSibPos];
+
+  // Remove the node from its current index
   var removed = nodes.splice(fromIndex, 1)[0];
 
-  // If we removed an earlier element, the target index shifts left by 1
-  if (fromIndex < toIndex) toIndex--;
+  // If moving down/bottom, we want it to land AFTER the target sibling.
+  // After removal, indices may shift, so recompute an insertion index carefully.
+  var insertIndex;
 
-  // Insert BEFORE the target when moving up/top, AFTER when moving down/bottom
-  // (but since targetId is the sibling occupying the destination slot, inserting before it is correct)
-  nodes.splice(toIndex, 0, removed);
+  if (direction === "down" || direction === "bottom") {
+    // After removal, if the target was after the removed node, it shifts left by 1
+    if (targetIndex > fromIndex) targetIndex--;
+    insertIndex = targetIndex + 1;
+  } else {
+    // up/top: insert BEFORE the target sibling
+    if (targetIndex > fromIndex) targetIndex--;
+    insertIndex = targetIndex;
+  }
 
+  nodes.splice(insertIndex, 0, removed);
   updateAllViews();
 }
 
