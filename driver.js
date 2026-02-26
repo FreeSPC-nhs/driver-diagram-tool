@@ -2092,11 +2092,16 @@ function ensureNodeContextMenu() {
     btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
     btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
     btn.addEventListener("click", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      closeNodeContextMenu();
-      onClick();
-    });
+  e.preventDefault();
+  e.stopPropagation();
+
+  // capture the id before closing the menu (close clears contextNodeId)
+  var id = contextNodeId;
+
+  // run the action first, then close
+  onClick(id);
+  closeNodeContextMenu();
+});
     menu.appendChild(btn);
   }
 
@@ -2109,42 +2114,42 @@ function ensureNodeContextMenu() {
   }
 
   // Build menu items
-  addItem("Edit text…", function () {
-    if (!contextNodeId) return;
-    editNode(contextNodeId);
-  });
+  addItem("Edit text…", function (id) {
+  if (!id) return;
+  editNode(id);
+});
 
-  addItem("Change colour", function () {
-    if (!contextNodeId) return;
-    var n = nodes.find(function (x) { return x.id === contextNodeId; });
-    if (n) cycleNodeColor(n);
-  });
-
-  addDivider();
-
-  addItem("Move up", function () {
-    if (!contextNodeId) return;
-    moveNodeWithinSiblings(contextNodeId, "up");
-  });
-  addItem("Move down", function () {
-    if (!contextNodeId) return;
-    moveNodeWithinSiblings(contextNodeId, "down");
-  });
-  addItem("Move to top", function () {
-    if (!contextNodeId) return;
-    moveNodeWithinSiblings(contextNodeId, "top");
-  });
-  addItem("Move to bottom", function () {
-    if (!contextNodeId) return;
-    moveNodeWithinSiblings(contextNodeId, "bottom");
-  });
+addItem("Change colour", function (id) {
+  if (!id) return;
+  var n = nodes.find(function (x) { return x.id === id; });
+  if (n) cycleNodeColor(n);
+});
 
   addDivider();
 
-  addItem("Delete…", function () {
-    if (!contextNodeId) return;
-    deleteNode(contextNodeId);
-  });
+  addItem("Move up", function (id) {
+  if (!id) return;
+  moveNodeWithinSiblings(id, "up");
+});
+addItem("Move down", function (id) {
+  if (!id) return;
+  moveNodeWithinSiblings(id, "down");
+});
+addItem("Move to top", function (id) {
+  if (!id) return;
+  moveNodeWithinSiblings(id, "top");
+});
+addItem("Move to bottom", function (id) {
+  if (!id) return;
+  moveNodeWithinSiblings(id, "bottom");
+});
+
+  addDivider();
+
+  addItem("Delete…", function (id) {
+  if (!id) return;
+  deleteNode(id);
+});
 
   document.body.appendChild(menu);
   nodeContextMenuEl = menu;
