@@ -624,122 +624,151 @@
     </section>
   </main>
 
-  <!-- Help / FAQ and About modal -->
-  <div id="helpOverlay" class="modal-overlay" aria-hidden="true">
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
-      <button class="modal-close-btn" id="helpCloseBtn" aria-label="Close help">×</button>
+<!-- Help / FAQ and About modal -->
+<div id="helpOverlay" class="modal-overlay" aria-hidden="true">
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+    <button class="modal-close-btn" id="helpCloseBtn" aria-label="Close help">×</button>
 
-      <h2 id="helpModalTitle">Help & information</h2>
+    <h2 id="helpModalTitle">Help & information</h2>
 
-<h3>Using this tool</h3>
-<p>
-  This web-based driver diagram tool lets you create and edit a driver diagram made up of an
-  <strong>aim</strong>, <strong>primary drivers</strong>, <strong>secondary drivers</strong>,
-  and <strong>change ideas</strong>. You can edit items directly, manage colours, and export
-  the diagram for reports or presentations.
-</p>
+    <h3>Using this tool</h3>
+    <p>
+      This web-based driver diagram tool lets you create and edit a structured driver diagram made up of an
+      <strong>Aim</strong>, <strong>Primary drivers</strong>, <strong>Secondary drivers</strong>,
+      and <strong>Change ideas</strong>.
+      The diagram updates instantly as you edit, reorder, colour, or resize items.
+    </p>
 
-<p class="faq-question">1. Understanding the diagram structure</p>
-<ul>
-  <li><strong>Aim</strong>: the overall goal you are trying to achieve (left-hand column).</li>
-  <li><strong>Primary drivers</strong>: the main factors that directly contribute to the aim.</li>
-  <li><strong>Secondary drivers</strong>: factors that influence the primary drivers.</li>
-  <li><strong>Change ideas</strong>: specific actions or tests of change that influence drivers.</li>
-</ul>
+    <p class="faq-question">1. Understanding the diagram structure</p>
+    <ul>
+      <li><strong>Aim</strong>: the overall goal you are trying to achieve (left-hand column).</li>
+      <li><strong>Primary drivers</strong>: the main factors that directly contribute to the aim.</li>
+      <li><strong>Secondary drivers</strong>: factors that influence the primary drivers.</li>
+      <li><strong>Change ideas</strong>: specific actions or tests of change that influence drivers.</li>
+    </ul>
 
-<p>
-  The diagram cause and effect from right to left: if we implement these
-  <strong>change ideas</strong>, they should influence our
-  <strong>secondary and primary drivers</strong>, which together help us achieve the
-  <strong>aim</strong>.
-</p>
+    <p>
+      The diagram shows cause and effect from right to left: if we implement these
+      <strong>change ideas</strong>, they influence our
+      <strong>secondary and primary drivers</strong>, which together help us achieve the
+      <strong>aim</strong>.
+    </p>
 
-<p class="faq-question">2. Adding and editing items</p>
-<ul>
-  <li>Use the <strong>diagram table</strong> or <strong>diagram columns</strong> to add new items.</li>
-  <li>Click on an item’s text to <strong>edit it directly</strong>.</li>
-  <li>Select the appropriate <strong>level</strong> (Aim, Primary driver, Secondary driver, or Change idea).</li>
-  <li>Items automatically appear in the correct column and connect to their parent.</li>
-</ul>
+    <p class="faq-question">2. Adding items</p>
+    <ul>
+      <li>Use the <strong>+ buttons</strong> on any box to add a child item at the next level.</li>
+      <li>New items automatically appear in the correct column and connect to their parent.</li>
+      <li>You can also add items from the controls panel if preferred.</li>
+    </ul>
 
-<p class="faq-question">3. Reordering and organising</p>
-<ul>
-  <li>Items can be moved within their column to change their visual order.</li>
-  <li>The diagram automatically redraws connections as items are updated.</li>
-  <li>This allows the diagram to evolve as your thinking develops.</li>
-</ul>
+    <p class="faq-question">3. Editing items</p>
+    <ul>
+      <li>Click directly on an item’s text to edit it.</li>
+      <li>Right-click (or use the context menu) on any item for more options.</li>
+      <li>You can edit column headings by clicking on the heading text.</li>
+    </ul>
 
-<p class="faq-question">4. Using colours</p>
-<ul>
-  <li>Colours can be used to group related drivers or change ideas.</li>
-  <li>You can <strong>add new colours</strong>, <strong>rename existing colours</strong>, or
-      <strong>delete colours</strong> using the colour management controls.</li>
-  <li>Applying a colour helps visually highlight themes, workstreams, or priorities.</li>
-</ul>
+    <p class="faq-question">4. Reordering items</p>
+    <ul>
+      <li>Right-click an item and use <strong>Move up</strong>, <strong>Move down</strong>,
+          <strong>Move to top</strong>, or <strong>Move to bottom</strong>.</li>
+      <li>Items are reordered within their level and parent group.</li>
+      <li>The diagram automatically redraws to maintain correct branch alignment.</li>
+    </ul>
 
-<p class="faq-question">5. Editing and deleting</p>
-<ul>
-  <li>Click on an item to edit its text.</li>
-  <li>Use the delete option to remove items you no longer need.</li>
-  <li>Deleting an item will also remove its connections from the diagram.</li>
-</ul>
+    <p class="faq-question">5. Auto-sizing boxes</p>
+    <ul>
+      <li>If text is long, right-click the item and choose
+          <strong>Toggle auto-size to text</strong>.</li>
+      <li>The box will expand vertically to fit its content.</li>
+      <li>The diagram layout automatically adjusts so connections remain aligned.</li>
+    </ul>
 
-<p class="faq-question">6. Exporting and sharing</p>
-<ul>
-  <li>The diagram can be exported for use in reports, presentations, or documentation.</li>
-  <li>This makes it easy to share your thinking with colleagues and stakeholders.</li>
-</ul>
+    <p class="faq-question">6. Using colours</p>
+    <ul>
+      <li>Add, rename, or delete colours in the colour management panel.</li>
+      <li>Right-click any box and use <strong>Change colour ▸</strong> to select from your defined colours.</li>
+      <li>Colours can help group themes, workstreams, priorities, or ownership.</li>
+      <li>The legend updates automatically to reflect your palette.</li>
+    </ul>
 
-<p>
-  This tool is designed to support continuous learning. As you test change ideas and review
-  data (for example using run charts or SPC), you can update the diagram to reflect your
-  latest understanding.
-</p>
-<h3>Further information</h3>
+    <p class="faq-question">7. Connections and structure</p>
+    <ul>
+      <li>Items are connected automatically to their parent.</li>
+      <li>You can add or remove additional connections using the connector button.</li>
+      <li>The diagram maintains parent–child structure while allowing flexible linking.</li>
+    </ul>
 
-<p>
-  If you would like to learn more about driver diagrams and how they are used in
-  quality improvement, the following resources provide clear and authoritative guidance:
-</p>
+    <p class="faq-question">8. Deleting items</p>
+    <ul>
+      <li>Right-click an item and choose <strong>Delete…</strong>.</li>
+      <li>Deleting an item also removes its dependent child items.</li>
+      <li>Connections associated with deleted items are removed automatically.</li>
+    </ul>
 
-<ul>
-  <li>
-    <a href="https://www.england.nhs.uk/improvement-hub/wp-content/uploads/sites/44/2018/06/An-example-of-driver-diagrams-1.pdf"
-       target="_blank"
-       rel="noopener"
-       title="NHS England guidance explaining what driver diagrams are, how to build them, and how they are used in NHS quality improvement">
-      <strong>NHS England – Driver diagrams</strong>
-    </a><br>
-    Practical NHS guidance on creating and using driver diagrams in quality improvement work.
-  </li>
+    <p class="faq-question">9. Appearance settings</p>
+    <ul>
+      <li>Adjust box height, vertical spacing, font size, font family, and bold styling.</li>
+      <li>Appearance settings apply globally to the diagram.</li>
+      <li>Auto-sized boxes will expand beyond the base height if needed.</li>
+    </ul>
 
-  <li>
-    <a href="https://www.ihi.org/resources/Pages/Tools/Driver-Diagram.aspx"
-       target="_blank"
-       rel="noopener"
-       title="Institute for Healthcare Improvement guidance on the purpose, structure, and use of driver diagrams">
-      <strong>Institute for Healthcare Improvement (IHI) – Driver Diagrams</strong>
-    </a><br>
-    A widely recognised international reference explaining the purpose and structure of driver diagrams.
-  </li>
+    <p class="faq-question">10. Exporting and saving</p>
+    <ul>
+      <li>Export as <strong>PNG</strong> for presentations or reports.</li>
+      <li>Export as <strong>PDF</strong> for sharing or printing.</li>
+      <li>Download and upload <strong>CSV files</strong> to save your work.</li>
+      <li>CSV export preserves structure, colours, appearance settings, and layout order.</li>
+    </ul>
 
-  <li>
-    <a href="https://www.ihi.org/resources/Pages/HowtoImprove/default.aspx"
-       target="_blank"
-       rel="noopener"
-       title="Overview of the Model for Improvement, including aims, measures, and PDSA cycles">
-      <strong>The Model for Improvement</strong>
-    </a><br>
-    Background reading on how driver diagrams fit alongside PDSA cycles and measurement.
-  </li>
-</ul>
+    <p>
+      This tool is designed to support continuous learning. As you test change ideas and review
+      data (for example using run charts or SPC), you can update the diagram to reflect your
+      latest understanding.
+    </p>
 
-<p>
-  These resources can help you get the most value from this tool.
+    <h3>Further information</h3>
 
-    </div>
+    <p>
+      If you would like to learn more about driver diagrams and how they are used in
+      quality improvement, the following resources provide clear and authoritative guidance:
+    </p>
+
+    <ul>
+      <li>
+        <a href="https://www.england.nhs.uk/improvement-hub/wp-content/uploads/sites/44/2018/06/An-example-of-driver-diagrams-1.pdf"
+           target="_blank"
+           rel="noopener">
+          <strong>NHS England – Driver diagrams</strong>
+        </a><br>
+        Practical NHS guidance on creating and using driver diagrams in quality improvement work.
+      </li>
+
+      <li>
+        <a href="https://www.ihi.org/resources/Pages/Tools/Driver-Diagram.aspx"
+           target="_blank"
+           rel="noopener">
+          <strong>Institute for Healthcare Improvement (IHI) – Driver Diagrams</strong>
+        </a><br>
+        A widely recognised international reference explaining the purpose and structure of driver diagrams.
+      </li>
+
+      <li>
+        <a href="https://www.ihi.org/resources/Pages/HowtoImprove/default.aspx"
+           target="_blank"
+           rel="noopener">
+          <strong>The Model for Improvement</strong>
+        </a><br>
+        Background reading on how driver diagrams fit alongside PDSA cycles and measurement.
+      </li>
+    </ul>
+
+    <p>
+      These resources can help you get the most value from this tool.
+    </p>
+
   </div>
-
+</div>
   <script src="driver.js"></script>
 </body>
 </html>
