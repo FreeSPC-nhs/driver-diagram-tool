@@ -588,6 +588,13 @@ function renderDiagram() {
   var svg = document.getElementById("diagramConnections");
   if (!canvas || !columnsContainer || !svg) return;
 
+// Prevent the browser context menu anywhere inside the diagram area
+[canvas, columnsContainer, svg].forEach(function (el) {
+  el.addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+  });
+});
+
   // Clear columns
   columnsContainer.innerHTML = "";
 
@@ -834,21 +841,6 @@ box.style.right = "0px";
         cycleNodeColor(node);
       });
       box.appendChild(badge);
-
-	// Delete button (shown on hover)
-	var del = document.createElement("button");
-	del.type = "button";
-	del.className = "diagram-delete";
-	del.textContent = "×";
-	del.title = "Delete this item";
-	del.setAttribute("aria-label", "Delete " + getLevelLabel(node.level));
-
-	del.addEventListener("click", function (e) {
-	  e.stopPropagation();
-	  deleteNode(node.id);
-	});
-
-	if (node.level !== "aim") box.appendChild(del);
 
       stack.appendChild(box);
     });
@@ -2130,12 +2122,197 @@ function ensureNodeContextMenu() {
   editNode(id);
 });
 
-addItem("Change colour", function (id) {
-  if (!id) return;
-  var n = nodes.find(function (x) { return x.id === id; });
-  if (n) cycleNodeColor(n);
-});
+function addDisabledItem(label) {
+  var div = document.createElement("div");
+  div.textContent = label;
+  div.style.padding = "8px 10px";
+  div.style.color = "#6b7280";
+  div.style.userSelect = "none";
+  menu.appendChild(div);
+}
 
+function addColorSubmenu(label) {
+  // Container row (looks like other items)
+  var row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.alignItems = "center";
+  row.style.justifyContent = "space-between";
+  row.style.padding = "8px 10px";
+  row.style.borderRadius = "6px";
+  row.style.cursor = "pointer";
+  row.style.color = "#111";
+  row.textContent = label;
+
+  row.addEventListener("mouseenter", function () { row.style.background = "#f6f8fa"; });
+  row.addEventListener("mouseleave", function () { row.style.background = "transparent"; });
+
+  // Submenu
+  var sub = document.createElement("div");
+  sub.style.position = "fixed";
+  sub.style.display = "none";
+  sub.style.zIndex = "10000";
+  sub.style.minWidth = "220px";
+  sub.style.background = "#fff";
+  sub.style.border = "1px solid #d0d7de";
+  sub.style.borderRadius = "8px";
+  sub.style.boxShadow = "0 8px 24px rgba(0,0,0,0.14)";
+  sub.style.padding = "6px";
+  sub.style.fontSize = "13px";
+  sub.style.color = "#111";
+
+  function showSubmenu() {
+    // Build items fresh each open (reflect latest colorOptions)
+    sub.innerHTML = "";
+
+    var id = contextNodeId; // current node
+    var n = nodes.find(function (x) { return x.id === id; });
+    if (!n) return;
+
+    // No colour option
+    (function () {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "No colour";
+      btn.style.display = "flex";
+      btn.style.alignItems = "center";
+      btn.style.gap = "8px";
+      btn.style.width = "100%";
+      btn.style.textAlign = "left";
+      btn.style.padding = "8px 10px";
+      btn.style.border = "0";
+      btn.style.background = "transparent";
+      btn.style.cursor = "pointer";
+      btn.style.borderRadius = "6px";
+      btn.style.color = "#111";
+      btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
+      btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
+      btn.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        n.color = "";
+        updateAllViews();
+        closeNodeContextMenu();
+        sub.style.display = "none";
+      });
+      sub.appendChild(btn);
+    })();
+
+    // Divider line
+    var hr = document.createElement("div");
+    hr.style.height = "1px";
+    hr.style.background = "#eaeef2";
+    hr.style.margin = "6px 0";
+    sub.appendChild(hr);
+
+    if (!colorOptions || !colorOptions.length) {
+      var msg = document.createElement("div");
+      msg.textContent = "No colours defined (add some in the sidebar).";
+      msg.style.padding = "8px 10px";
+      msg.style.color = "#6b7280";
+      msg.style.userSelect = "none";
+      sub.appendChild(msg);
+      return;
+    }
+
+    colorOptions.forEach(function (opt) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.style.display = "flex";
+      btn.style.alignItems = "center";
+      btn.style.gap = "8px";
+      btn.style.width = "100%";
+      btn.style.textAlign = "left";
+      btn.style.padding = "8px 10px";
+      btn.style.border = "0";
+      btn.style.background = "transparent";
+      btn.style.cursor = "pointer";
+      btn.style.borderRadius = "6px";
+      btn.style.color = "#111";
+
+      var sw = document.createElement("span");
+      sw.style.width = "12px";
+      sw.style.height = "12px";
+      sw.style.borderRadius = "3px";
+      sw.style.border = "1px solid #d0d7de";
+      sw.style.background = opt.value;
+
+      var txt = document.createElement("span");
+      txt.textContent = opt.label + " (" + opt.value + ")";
+
+      btn.appendChild(sw);
+      btn.appendChild(txt);
+
+      btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
+      btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
+
+      btn.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        n.color = opt.value;
+        updateAllViews();
+        closeNodeContextMenu();
+        sub.style.display = "none";
+      });
+
+      sub.appendChild(btn);
+    });
+  }
+
+  function positionSubmenu() {
+    // Place it to the right of the main menu item
+    var r = row.getBoundingClientRect();
+    var x = r.right + 6;
+    var y = r.top;
+
+    // Temporarily show to measure
+    sub.style.display = "block";
+    var sr = sub.getBoundingClientRect();
+
+    var maxX = window.innerWidth - sr.width - 8;
+    var maxY = window.innerHeight - sr.height - 8;
+
+    if (x > maxX) x = r.left - sr.width - 6; // flip left if needed
+    if (y > maxY) y = maxY;
+
+    sub.style.left = x + "px";
+    sub.style.top = y + "px";
+  }
+
+  row.addEventListener("mouseenter", function () {
+    showSubmenu();
+    positionSubmenu();
+  });
+
+  row.addEventListener("mouseleave", function () {
+    // Give a tiny delay so moving into submenu doesn't close it immediately
+    setTimeout(function () {
+      if (!sub.matches(":hover") && !row.matches(":hover")) {
+        sub.style.display = "none";
+      }
+    }, 120);
+  });
+
+  sub.addEventListener("mouseleave", function () {
+    setTimeout(function () {
+      if (!sub.matches(":hover") && !row.matches(":hover")) {
+        sub.style.display = "none";
+      }
+    }, 120);
+  });
+
+  // Prevent clicks inside submenu from bubbling out
+  sub.addEventListener("click", function (e) { e.stopPropagation(); });
+
+  menu.appendChild(row);
+  document.body.appendChild(sub);
+
+  // Also hide submenu when the main menu closes
+  var oldClose = closeNodeContextMenu;
+  closeNodeContextMenu = function () {
+    sub.style.display = "none";
+    oldClose();
+  };
+}
+
+addColorSubmenu("Change colour ▸");
   addDivider();
 
   addItem("Move up", function (id) {
@@ -2226,6 +2403,13 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnHelp = document.getElementById("btnHelp");
   var helpOverlay = document.getElementById("helpOverlay");
   var helpCloseBtn = document.getElementById("helpCloseBtn");
+
+var exportArea = document.getElementById("exportArea");
+if (exportArea) {
+  exportArea.addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+  });
+}
 
   if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
   if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
