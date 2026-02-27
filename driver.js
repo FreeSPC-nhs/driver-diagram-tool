@@ -33,6 +33,10 @@ var nodeContextMenuEl = null;
 var contextNodeId = null;
 var nodeContextSubmenuEl = null; // NEW: holds the colour submenu element
 
+// --- Auto-size measurement cache (prevents "extra gap") ---
+var measuredAutoHeightsById = {};
+var suppressAutosizeRelayout = false;
+
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
 
@@ -654,18 +658,17 @@ var fs  = diagramAppearance && diagramAppearance.fontSize ? diagramAppearance.fo
 
 // We need an estimate of the inner width available for text.
 // Use the column stack width if available; fall back to a sensible number.
-var stackWidthGuess = 320;
-var stacks = columnsContainer.querySelectorAll(".diagram-column-stack");
-if (stacks && stacks.length) {
-  // any stack will do; they’re same width
-  var w = stacks[0].clientWidth;
-  if (w && w > 50) stackWidthGuess = w;
-}
-
 var heightById = {};
 nodes.forEach(function (n) {
-  if (n.autoSize) {
-    heightById[n.id] = estimateAutoHeightPx(n.text, fs, stackWidthGuess, boxH);
+  if (!n.autoSize) return;
+
+  // Prefer real measured height (best). Fall back to estimate once.
+  if (measuredAutoHeightsById[n.id]) {
+    heightById[n.id] = measuredAutoHeightsById[n.id];
+  } else {
+    // We don't know the real width yet on first pass, so just do a rough estimate.
+    // This will be corrected immediately after render by measuring.
+    heightById[n.id] = estimateAutoHeightPx(n.text, fs, 320, boxH);
   }
 });
 
@@ -914,13 +917,50 @@ box.style.right = "0px";
   });
 
   // Draw connecting lines after layout has happened
-  if (!window.requestAnimationFrame) {
+if (!window.requestAnimationFrame) {
+  drawConnections(canvas, svg);
+} else {
+  window.requestAnimationFrame(function () {
+    // Measure actual auto-sized node heights and re-layout once if needed
+    if (!suppressAutosizeRelayout) {
+      var changed = false;
+
+      nodes.forEach(function (n) {
+        if (!n.autoSize) return;
+
+        var el = canvas.querySelector('.diagram-node[data-id="' + n.id + '"]');
+        if (!el) return;
+
+        // Real rendered height (includes wrapping)
+        var h = el.offsetHeight;
+
+        // Clamp to at least the global base box height
+        var minH =
+          (diagramAppearance && diagramAppearance.boxHeight)
+            ? diagramAppearance.boxHeight
+            : 32;
+
+        if (h < minH) h = minH;
+
+        if (measuredAutoHeightsById[n.id] !== h) {
+          measuredAutoHeightsById[n.id] = h;
+          changed = true;
+        }
+      });
+
+      // If anything changed, run a second render using measured heights
+      if (changed) {
+        suppressAutosizeRelayout = true;
+        updateAllViews(); // will re-render diagram + re-run this block
+        suppressAutosizeRelayout = false;
+        return; // don't draw connections now; next render will do it
+      }
+    }
+
+    // If no re-layout needed, just draw the connections
     drawConnections(canvas, svg);
-  } else {
-    window.requestAnimationFrame(function () {
-      drawConnections(canvas, svg);
-    });
-  }
+  });
+}
 }
 
 function drawConnections(canvas, svg) {
