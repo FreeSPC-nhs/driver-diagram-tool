@@ -31,6 +31,7 @@ var tableVisible = false;
 // --- Right-click context menu state ---
 var nodeContextMenuEl = null;
 var contextNodeId = null;
+var nodeContextSubmenuEl = null; // NEW: holds the colour submenu element
 
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
@@ -64,7 +65,8 @@ function createNode(options) {
     level: level,
     text: text,
     parentId: parentId,
-    color: color
+    color: color,
+    autoSize: !!options.autoSize
   };
 }
 
@@ -464,7 +466,7 @@ function renderLegend() {
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
 
-function computeTreeLayout(byLevel, boxH, gap) {
+function computeTreeLayout(byLevel, boxH, gap, heightById) {
   var aimNodes = byLevel.aim || [];
   var primaryNodes = byLevel.primary || [];
   var secondaryNodes = byLevel.secondary || [];
@@ -485,17 +487,28 @@ function computeTreeLayout(byLevel, boxH, gap) {
     changesBySecondary[sid].push(c);
   });
 
+function nodeH(id) {
+  return (heightById && heightById[id]) ? heightById[id] : boxH;
+}
   // Height required for a secondary branch (secondary + its changes)
   function secondaryBranchHeight(secId) {
     var kids = changesBySecondary[secId] || [];
-    if (kids.length <= 1) return boxH;
-    return Math.max(boxH, kids.length * boxH + (kids.length - 1) * gap);
+    var secBoxH = nodeH(secId);
+if (kids.length === 0) return secBoxH;
+
+var sum = 0;
+kids.forEach(function (k, i) {
+  sum += nodeH(k.id);
+  if (i < kids.length - 1) sum += gap;
+});
+return Math.max(secBoxH, sum);
   }
 
   // Height required for a primary branch (primary + all its secondary branches)
   function primaryBranchHeight(primaryId) {
     var secs = secondariesByPrimary[primaryId] || [];
-    if (secs.length === 0) return boxH;
+    var pBoxH = nodeH(primaryId);
+    if (secs.length === 0) return pBoxH;
 
     var sum = 0;
     secs.forEach(function (sec, i) {
@@ -503,7 +516,7 @@ function computeTreeLayout(byLevel, boxH, gap) {
       if (i < secs.length - 1) sum += gap; // gap between secondary groups
     });
 
-    return Math.max(boxH, sum);
+    return Math.max(pBoxH, sum);
   }
 
   // Compute overall diagram height by stacking primary branches
@@ -522,7 +535,7 @@ function computeTreeLayout(byLevel, boxH, gap) {
 
   // Place Aim in the middle of the total height (if it exists)
   if (aimNodes.length) {
-    topById[aimNodes[0].id] = Math.max(0, (totalHeight - boxH) / 2);
+    topById[aimNodes[0].id] = Math.max(0, (totalHeight - nodeH(aimNodes[0].id)) / 2);
   }
 
   // Lay out primaries, and within each primary lay out its secondaries and changes
@@ -532,7 +545,7 @@ function computeTreeLayout(byLevel, boxH, gap) {
     var pHeight = primaryBranchHeight(p.id);
 
     // Primary box centred within its branch block
-    topById[p.id] = cursorY + (pHeight - boxH) / 2;
+    topById[p.id] = cursorY + (pHeight - nodeH(p.id)) / 2;
 
     // Secondary blocks stacked within this primary block
     var secCursorY = cursorY;
@@ -542,14 +555,14 @@ function computeTreeLayout(byLevel, boxH, gap) {
       var secH = secondaryBranchHeight(sec.id);
 
       // Secondary box centred within its own block
-      topById[sec.id] = secCursorY + (secH - boxH) / 2;
+      topById[sec.id] = secCursorY + (secH - nodeH(sec.id)) / 2;
 
       // Change ideas stacked within the secondary block, starting at the top of the block
       var changes = changesBySecondary[sec.id] || [];
       var chCursorY = secCursorY;
       changes.forEach(function (ch, chIndex) {
         topById[ch.id] = chCursorY;
-        chCursorY += boxH + gap;
+        chCursorY += nodeH(ch.id) + gap;
       });
 
       secCursorY += secH;
@@ -582,6 +595,28 @@ function computeTreeLayout(byLevel, boxH, gap) {
   return { topById: topById, totalHeight: totalHeight };
 }
 
+function estimateAutoHeightPx(text, fontSizePx, boxWidthPx, baseBoxHeightPx) {
+  // Rough-but-good estimate of wrapping height without measuring DOM.
+  // Works well for predictable UI + monos-ish average widths.
+  if (!text) return baseBoxHeightPx;
+
+  var paddingY = 10;              // adjust if your node padding differs
+  var lineHeight = Math.round(fontSizePx * 1.25);
+
+  // average character width ~0.55–0.6 of font size for typical fonts
+  var avgCharW = fontSizePx * 0.58;
+
+  // subtract space for icons/buttons/badge etc.
+  var usableW = Math.max(80, boxWidthPx - 60);
+
+  var charsPerLine = Math.max(10, Math.floor(usableW / avgCharW));
+  var lines = Math.ceil(text.length / charsPerLine);
+
+  var h = paddingY + lines * lineHeight + paddingY;
+  return Math.max(baseBoxHeightPx, h);
+}
+
+
 function renderDiagram() {
   var canvas = document.getElementById("diagramCanvas");
   var columnsContainer = document.getElementById("diagramColumns");
@@ -613,7 +648,28 @@ function renderDiagram() {
 var boxH = (diagramAppearance && diagramAppearance.boxHeight) ? diagramAppearance.boxHeight : 32;
 var gap = (diagramAppearance && diagramAppearance.verticalGap != null) ? diagramAppearance.verticalGap : 8;
 
-var layout = computeTreeLayout(byLevel, boxH, gap);
+var boxH = diagramAppearance && diagramAppearance.boxHeight ? diagramAppearance.boxHeight : 32;
+var gap = diagramAppearance && diagramAppearance.verticalGap != null ? diagramAppearance.verticalGap : 8;
+var fs  = diagramAppearance && diagramAppearance.fontSize ? diagramAppearance.fontSize : 13;
+
+// We need an estimate of the inner width available for text.
+// Use the column stack width if available; fall back to a sensible number.
+var stackWidthGuess = 320;
+var stacks = columnsContainer.querySelectorAll(".diagram-column-stack");
+if (stacks && stacks.length) {
+  // any stack will do; they’re same width
+  var w = stacks[0].clientWidth;
+  if (w && w > 50) stackWidthGuess = w;
+}
+
+var heightById = {};
+nodes.forEach(function (n) {
+  if (n.autoSize) {
+    heightById[n.id] = estimateAutoHeightPx(n.text, fs, stackWidthGuess, boxH);
+  }
+});
+
+var layout = computeTreeLayout(byLevel, boxH, gap, heightById);
 
 // Make sure the canvas is tall enough to contain absolutely-positioned nodes
 canvas.style.minHeight = Math.ceil(layout.totalHeight + gap * 2) + "px";
@@ -696,6 +752,9 @@ stack.style.height = Math.ceil(layout.totalHeight) + "px";
     byLevel[level].forEach(function (node) {
       var box = document.createElement("div");
       box.className = "diagram-node level-" + level;
+      box.style.whiteSpace = "normal";
+      box.style.wordBreak = "break-word";
+      box.style.overflowWrap = "anywhere";
       box.setAttribute("data-id", node.id);
 
 // Right-click context menu
@@ -713,8 +772,14 @@ box.style.right = "0px";
 
 	// Apply appearance settings
     if (diagramAppearance) {
-      box.style.height = diagramAppearance.boxHeight + "px";
-      box.style.minHeight = diagramAppearance.boxHeight + "px";
+      var baseH = diagramAppearance.boxHeight + "px";
+	box.style.minHeight = baseH;
+
+	if (node.autoSize) {
+	  box.style.height = "auto";
+	} else {
+	  box.style.height = baseH;
+	}
       box.style.fontSize = diagramAppearance.fontSize + "px";
       if (diagramAppearance.fontFamily) {
         box.style.fontFamily = diagramAppearance.fontFamily;
@@ -1619,6 +1684,7 @@ function downloadCsv() {
       parent_id: mainParentId,
       text: n.text,
       color: n.color || "",
+      auto_size: n.autoSize ? "1" : "0",
       extra_parents: extraParents.join(";"),
       box_height: diagramAppearance.boxHeight,
       vertical_gap: diagramAppearance.verticalGap,
@@ -1690,7 +1756,8 @@ function uploadCsv(file) {
           level: level,
           text: text,
           parentId: parentId,
-          color: color
+          color: color,
+	  autoSize: ((row.auto_size || "").toString().trim() === "1")
         });
 
         // Parse extra parents into an array of IDs
@@ -2122,6 +2189,14 @@ function ensureNodeContextMenu() {
   editNode(id);
 });
 
+addItem("Toggle auto-size to text", function (id) {
+  if (!id) return;
+  var n = nodes.find(function (x) { return x.id === id; });
+  if (!n) return;
+  n.autoSize = !n.autoSize;
+  updateAllViews();
+});
+
 function addDisabledItem(label) {
   var div = document.createElement("div");
   div.textContent = label;
@@ -2132,7 +2207,7 @@ function addDisabledItem(label) {
 }
 
 function addColorSubmenu(label) {
-  // Container row (looks like other items)
+  // Row inside the main context menu
   var row = document.createElement("div");
   row.style.display = "flex";
   row.style.alignItems = "center";
@@ -2141,17 +2216,25 @@ function addColorSubmenu(label) {
   row.style.borderRadius = "6px";
   row.style.cursor = "pointer";
   row.style.color = "#111";
-  row.textContent = label;
+
+  var left = document.createElement("span");
+  left.textContent = label;
+  var right = document.createElement("span");
+  right.textContent = "▸";
+  right.style.opacity = "0.7";
+
+  row.appendChild(left);
+  row.appendChild(right);
 
   row.addEventListener("mouseenter", function () { row.style.background = "#f6f8fa"; });
   row.addEventListener("mouseleave", function () { row.style.background = "transparent"; });
 
-  // Submenu
+  // Create submenu once
   var sub = document.createElement("div");
   sub.style.position = "fixed";
   sub.style.display = "none";
   sub.style.zIndex = "10000";
-  sub.style.minWidth = "220px";
+  sub.style.minWidth = "240px";
   sub.style.background = "#fff";
   sub.style.border = "1px solid #d0d7de";
   sub.style.borderRadius = "8px";
@@ -2160,22 +2243,21 @@ function addColorSubmenu(label) {
   sub.style.fontSize = "13px";
   sub.style.color = "#111";
 
-  function showSubmenu() {
-    // Build items fresh each open (reflect latest colorOptions)
+  // Save reference so closeNodeContextMenu can hide it
+  nodeContextSubmenuEl = sub;
+
+  function buildSubmenu() {
     sub.innerHTML = "";
 
-    var id = contextNodeId; // current node
+    var id = contextNodeId;
     var n = nodes.find(function (x) { return x.id === id; });
     if (!n) return;
 
-    // No colour option
-    (function () {
+    function addSubItem(text, onClick) {
       var btn = document.createElement("button");
       btn.type = "button";
-      btn.textContent = "No colour";
-      btn.style.display = "flex";
-      btn.style.alignItems = "center";
-      btn.style.gap = "8px";
+      btn.textContent = text;
+      btn.style.display = "block";
       btn.style.width = "100%";
       btn.style.textAlign = "left";
       btn.style.padding = "8px 10px";
@@ -2187,16 +2269,20 @@ function addColorSubmenu(label) {
       btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
       btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
       btn.addEventListener("click", function (e) {
-        e.preventDefault(); e.stopPropagation();
-        n.color = "";
-        updateAllViews();
-        closeNodeContextMenu();
-        sub.style.display = "none";
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
       });
       sub.appendChild(btn);
-    })();
+    }
 
-    // Divider line
+    // No colour
+    addSubItem("No colour", function () {
+      n.color = "";
+      updateAllViews();
+      closeNodeContextMenu();
+    });
+
     var hr = document.createElement("div");
     hr.style.height = "1px";
     hr.style.background = "#eaeef2";
@@ -2227,6 +2313,8 @@ function addColorSubmenu(label) {
       btn.style.cursor = "pointer";
       btn.style.borderRadius = "6px";
       btn.style.color = "#111";
+      btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
+      btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
 
       var sw = document.createElement("span");
       sw.style.width = "12px";
@@ -2241,15 +2329,12 @@ function addColorSubmenu(label) {
       btn.appendChild(sw);
       btn.appendChild(txt);
 
-      btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
-      btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
-
       btn.addEventListener("click", function (e) {
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         n.color = opt.value;
         updateAllViews();
         closeNodeContextMenu();
-        sub.style.display = "none";
       });
 
       sub.appendChild(btn);
@@ -2257,14 +2342,12 @@ function addColorSubmenu(label) {
   }
 
   function positionSubmenu() {
-    // Place it to the right of the main menu item
     var r = row.getBoundingClientRect();
+    sub.style.display = "block"; // show so we can measure
+    var sr = sub.getBoundingClientRect();
+
     var x = r.right + 6;
     var y = r.top;
-
-    // Temporarily show to measure
-    sub.style.display = "block";
-    var sr = sub.getBoundingClientRect();
 
     var maxX = window.innerWidth - sr.width - 8;
     var maxY = window.innerHeight - sr.height - 8;
@@ -2276,43 +2359,33 @@ function addColorSubmenu(label) {
     sub.style.top = y + "px";
   }
 
-  row.addEventListener("mouseenter", function () {
-    showSubmenu();
+  // Hover open/close with a small grace period
+  var hideTimer = null;
+  function show() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    buildSubmenu();
     positionSubmenu();
-  });
+  }
+  function scheduleHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      sub.style.display = "none";
+    }, 180);
+  }
 
-  row.addEventListener("mouseleave", function () {
-    // Give a tiny delay so moving into submenu doesn't close it immediately
-    setTimeout(function () {
-      if (!sub.matches(":hover") && !row.matches(":hover")) {
-        sub.style.display = "none";
-      }
-    }, 120);
+  row.addEventListener("mouseenter", show);
+  row.addEventListener("mouseleave", scheduleHide);
+  sub.addEventListener("mouseenter", function () {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
   });
+  sub.addEventListener("mouseleave", scheduleHide);
 
-  sub.addEventListener("mouseleave", function () {
-    setTimeout(function () {
-      if (!sub.matches(":hover") && !row.matches(":hover")) {
-        sub.style.display = "none";
-      }
-    }, 120);
-  });
-
-  // Prevent clicks inside submenu from bubbling out
   sub.addEventListener("click", function (e) { e.stopPropagation(); });
 
   menu.appendChild(row);
   document.body.appendChild(sub);
-
-  // Also hide submenu when the main menu closes
-  var oldClose = closeNodeContextMenu;
-  closeNodeContextMenu = function () {
-    sub.style.display = "none";
-    oldClose();
-  };
 }
-
-addColorSubmenu("Change colour ▸");
+addColorSubmenu("Change colour");
   addDivider();
 
   addItem("Move up", function (id) {
@@ -2377,6 +2450,7 @@ function openNodeContextMenu(nodeId, clientX, clientY) {
 }
 
 function closeNodeContextMenu() {
+  if (nodeContextSubmenuEl) nodeContextSubmenuEl.style.display = "none";
   if (!nodeContextMenuEl) return;
   nodeContextMenuEl.style.display = "none";
   contextNodeId = null;
