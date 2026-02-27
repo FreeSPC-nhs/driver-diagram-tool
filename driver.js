@@ -990,23 +990,6 @@ if (node.measures && node.measures.length) {
   box.appendChild(measuresWrap);
 }
 
-      // Colour badge
-      var badge = document.createElement("div");
-      badge.className = "diagram-color-badge";
-      if (node.color) {
-        badge.style.backgroundColor = node.color;
-      } else {
-        badge.style.backgroundColor = "#ffffff";
-      }
-      // Hint text / accessibility label
-      badge.title = "Click to change the colour of this box";
-      badge.setAttribute("aria-label", "Change colour");
-      badge.addEventListener("click", function (e) {
-        e.stopPropagation();
-        cycleNodeColor(node);
-      });
-      box.appendChild(badge);
-
       stack.appendChild(box);
     });
 
@@ -1863,24 +1846,12 @@ function uploadCsv(file) {
         console.error("CSV parse errors", results.errors);
       }
 
-      var rows = results.data;
+      var rows = results.data || [];
       var imported = [];
       var extraConnectionsRaw = []; // { childId, parents[] }
       var appearanceFromCsv = null;
-	var titlesFromCsv = null;
-	var paletteFromCsv = null;
-
-var measures = [];
-var mj = (row.measures_json || "").toString().trim();
-if (mj) {
-  try {
-    var parsedM = JSON.parse(mj);
-    if (Array.isArray(parsedM)) measures = parsedM;
-  } catch (e) {
-    console.warn("Could not parse measures_json:", e);
-  }
-}
-
+      var titlesFromCsv = null;
+      var paletteFromCsv = null;
 
       rows.forEach(function (row, index) {
         var id = (row.id || "").toString().trim();
@@ -1889,14 +1860,23 @@ if (mj) {
         var parentId = (row.parent_id || "").toString().trim();
         var color = (row.color || "").toString().trim();
 
+        // ---- Measures (NEW) ----
+        var measures = [];
+        var mj = (row.measures_json || "").toString().trim();
+        if (mj) {
+          try {
+            var parsedM = JSON.parse(mj);
+            if (Array.isArray(parsedM)) measures = parsedM;
+          } catch (e) {
+            console.warn("Could not parse measures_json on row " + (index + 1) + ":", e);
+          }
+        }
+
         // new column (may be missing in older CSVs)
-        var extraParentsField =
-          (row.extra_parents || "").toString().trim();
+        var extraParentsField = (row.extra_parents || "").toString().trim();
 
         if (!id || !level || !text) {
-          console.warn(
-            "Skipping row " + (index + 1) + " - missing id/level/text."
-          );
+          console.warn("Skipping row " + (index + 1) + " - missing id/level/text.");
           return;
         }
 
@@ -1906,7 +1886,7 @@ if (mj) {
           text: text,
           parentId: parentId,
           color: color,
-	  autoSize: ((row.auto_size || "").toString().trim() === "1"),
+          autoSize: ((row.auto_size || "").toString().trim() === "1"),
           measures: measures
         });
 
@@ -1922,32 +1902,33 @@ if (mj) {
           }
         }
 
-	if (!paletteFromCsv) {
-	  var rawPalette = (row.palette_json || "").toString().trim();
-	  if (rawPalette) {
-	    try {
-	      var parsed = JSON.parse(rawPalette);
-	      if (Array.isArray(parsed)) paletteFromCsv = parsed;
-	    } catch (e) {
-	      console.warn("Could not parse palette_json:", e);
-	    }
-	  }
-	}
+        // Palette (read once)
+        if (!paletteFromCsv) {
+          var rawPalette = (row.palette_json || "").toString().trim();
+          if (rawPalette) {
+            try {
+              var parsed = JSON.parse(rawPalette);
+              if (Array.isArray(parsed)) paletteFromCsv = parsed;
+            } catch (e) {
+              console.warn("Could not parse palette_json:", e);
+            }
+          }
+        }
 
+        // Titles (read once)
+        if (!titlesFromCsv) {
+          var ta = (row.title_aim || "").toString().trim();
+          var tp = (row.title_primary || "").toString().trim();
+          var ts = (row.title_secondary || "").toString().trim();
+          var tc = (row.title_change || "").toString().trim();
 
-	if (!titlesFromCsv) {
-  	var ta = (row.title_aim || "").toString().trim();
-  	var tp = (row.title_primary || "").toString().trim();
-  	var ts = (row.title_secondary || "").toString().trim();
-  	var tc = (row.title_change || "").toString().trim();
+          var hasAnyTitle = ta || tp || ts || tc;
+          if (hasAnyTitle) {
+            titlesFromCsv = { aim: ta, primary: tp, secondary: ts, change: tc };
+          }
+        }
 
-  	var hasAnyTitle = ta || tp || ts || tc;
-  	if (hasAnyTitle) {
-  	  titlesFromCsv = { aim: ta, primary: tp, secondary: ts, change: tc };
- 	 }
-	}
-
-        // --- NEW: appearance settings (read once, from first row that has them) ---
+        // Appearance settings (read once)
         if (!appearanceFromCsv) {
           var bh = parseInt(row.box_height, 10);
           var vg = parseInt(row.vertical_gap, 10);
@@ -1977,34 +1958,28 @@ if (mj) {
 
       nodes = imported;
       updateNextIdFromNodes();
+
+      // Palette restore
       if (paletteFromCsv && paletteFromCsv.length) {
-	  // Use saved palette (keeps colour names)
-	  colorOptions = paletteFromCsv
-	    .map(function (o) {
-	      return {
-	        label: (o.label || "").toString().trim(),
-	        value: (o.value || "").toString().trim()
-	      };
-	    })
-	    .filter(function (o) {
-	      return o.label && o.value;
-	    });
-	
-	  
-	} else {
-	  // Fallback for older CSVs
-	  rebuildColorOptionsFromNodes();
-	}
+        colorOptions = paletteFromCsv
+          .map(function (o) {
+            return {
+              label: (o.label || "").toString().trim(),
+              value: (o.value || "").toString().trim()
+            };
+          })
+          .filter(function (o) { return o.label && o.value; });
+      } else {
+        rebuildColorOptionsFromNodes();
+      }
 
-
-      // First, rebuild baseline connections from primary parent_id
+      // Baseline connections from parentId
       rebuildConnectionsFromParents();
 
-      // Then add extra connections from extra_parents
+      // Extra connections from extra_parents
       extraConnectionsRaw.forEach(function (entry) {
         var childId = entry.childId;
         entry.parents.forEach(function (pid) {
-          // only add if both ends exist and it's not already present
           var parentExists = nodes.some(function (n) { return n.id === pid; });
           var childExists = nodes.some(function (n) { return n.id === childId; });
           if (!parentExists || !childExists) return;
@@ -2018,7 +1993,7 @@ if (mj) {
         });
       });
 
-      // Apply appearance settings from CSV (if present)
+      // Apply appearance
       if (appearanceFromCsv) {
         diagramAppearance.boxHeight = appearanceFromCsv.boxHeight;
         diagramAppearance.verticalGap = appearanceFromCsv.verticalGap;
@@ -2028,16 +2003,16 @@ if (mj) {
         setAppearanceInputsFromConfig();
       }
 
-	if (titlesFromCsv) {
-	  if (titlesFromCsv.aim) columnTitles.aim = titlesFromCsv.aim;
-	  if (titlesFromCsv.primary) columnTitles.primary = titlesFromCsv.primary;
-	  if (titlesFromCsv.secondary) columnTitles.secondary = titlesFromCsv.secondary;
-	  if (titlesFromCsv.change) columnTitles.change = titlesFromCsv.change;
-	}
+      // Apply titles
+      if (titlesFromCsv) {
+        if (titlesFromCsv.aim) columnTitles.aim = titlesFromCsv.aim;
+        if (titlesFromCsv.primary) columnTitles.primary = titlesFromCsv.primary;
+        if (titlesFromCsv.secondary) columnTitles.secondary = titlesFromCsv.secondary;
+        if (titlesFromCsv.change) columnTitles.change = titlesFromCsv.change;
+      }
 
-	renderColorOptionsList();
-	renderLegend();
-
+      renderColorOptionsList();
+      renderLegend();
 
       updateAllViews();
       alert("Loaded " + nodes.length + " items from CSV.");
