@@ -70,7 +70,8 @@ function createNode(options) {
     text: text,
     parentId: parentId,
     color: color,
-    autoSize: !!options.autoSize
+    autoSize: !!options.autoSize,
+    measures: Array.isArray(options.measures) ? options.measures : []
   };
 }
 
@@ -99,6 +100,54 @@ function rebuildConnectionsFromParents() {
   });
 }
 
+
+function getMeasureTypeLabel(t) {
+  if (t === "outcome") return "Outcome";
+  if (t === "process") return "Process";
+  if (t === "balancing") return "Balancing";
+  return "Measure";
+}
+
+function getMeasureTypeIcon(t) {
+  // simple, font-safe icons
+  if (t === "outcome") return "●";
+  if (t === "process") return "◐";
+  if (t === "balancing") return "◑";
+  return "•";
+}
+
+function addMeasureToNode(nodeId) {
+  var n = nodes.find(function (x) { return x.id === nodeId; });
+  if (!n) return;
+
+  var type = window.prompt("Measure type: outcome / process / balancing", "process");
+  if (type === null) return;
+  type = (type || "").trim().toLowerCase();
+  if (!type) type = "process";
+
+  var text = window.prompt("Measure text:", "");
+  if (text === null) return;
+  text = (text || "").trim();
+  if (!text) return;
+
+  if (!Array.isArray(n.measures)) n.measures = [];
+  n.measures.push({ type: type, text: text });
+
+  // measures usually need space: turn on autoSize automatically (optional but recommended)
+  n.autoSize = true;
+
+  updateAllViews();
+}
+
+function clearMeasuresFromNode(nodeId) {
+  var n = nodes.find(function (x) { return x.id === nodeId; });
+  if (!n) return;
+  if (!n.measures || !n.measures.length) return;
+
+  if (!window.confirm("Remove all measures from this item?")) return;
+  n.measures = [];
+  updateAllViews();
+}
 
 function getLevelLabel(level) {
   if (level === "aim") return "Aim";
@@ -660,15 +709,30 @@ var fs  = diagramAppearance && diagramAppearance.fontSize ? diagramAppearance.fo
 // Use the column stack width if available; fall back to a sensible number.
 var heightById = {};
 nodes.forEach(function (n) {
-  if (!n.autoSize) return;
+  // Combine node text + measures for height estimation
+  var measuresText = "";
+  if (Array.isArray(n.measures) && n.measures.length) {
+    measuresText = "\n" + n.measures.map(function (m) {
+      var t = (m && m.type) ? ("[" + m.type + "] ") : "";
+      return t + ((m && m.text) ? m.text : "");
+    }).join("\n");
+  }
+
+  var combined = (n.text || "") + measuresText;
+
+  // IMPORTANT:
+  // - If autoSize is ON, we must size by content
+  // - If measures exist, we must also reserve height even if autoSize is OFF
+  var needsExtraHeight = !!n.autoSize || (Array.isArray(n.measures) && n.measures.length);
+
+  if (!needsExtraHeight) return;
 
   // Prefer real measured height (best). Fall back to estimate once.
-  if (measuredAutoHeightsById[n.id]) {
+  if (measuredAutoHeightsById && measuredAutoHeightsById[n.id]) {
     heightById[n.id] = measuredAutoHeightsById[n.id];
   } else {
-    // We don't know the real width yet on first pass, so just do a rough estimate.
-    // This will be corrected immediately after render by measuring.
-    heightById[n.id] = estimateAutoHeightPx(n.text, fs, 320, boxH);
+    // First pass rough estimate (fixed width guess); corrected after render by measuring
+    heightById[n.id] = estimateAutoHeightPx(combined, fs, 320, boxH);
   }
 });
 
@@ -778,11 +842,14 @@ box.style.right = "0px";
       var baseH = diagramAppearance.boxHeight + "px";
 	box.style.minHeight = baseH;
 
-	if (node.autoSize) {
-	  box.style.height = "auto";
-	} else {
-	  box.style.height = baseH;
-	}
+	// if measures exist, force autosize so measures are always visible
+var hasMeasures = Array.isArray(node.measures) && node.measures.length > 0;
+
+if (node.autoSize || hasMeasures) {
+  box.style.height = "auto";
+} else {
+  box.style.height = baseH;
+}
       box.style.fontSize = diagramAppearance.fontSize + "px";
       if (diagramAppearance.fontFamily) {
         box.style.fontFamily = diagramAppearance.fontFamily;
@@ -893,6 +960,36 @@ box.style.right = "0px";
       });
       box.appendChild(textSpan);
 
+// Measures (optional) - shown beneath the main text
+if (node.measures && node.measures.length) {
+  var measuresWrap = document.createElement("div");
+  measuresWrap.className = "diagram-measures";
+  measuresWrap.style.marginTop = "6px";
+  measuresWrap.style.fontSize = Math.max(10, (diagramAppearance.fontSize || 13) - 3) + "px";
+  measuresWrap.style.lineHeight = "1.2";
+  measuresWrap.style.opacity = "0.95";
+
+  node.measures.forEach(function (m) {
+    var row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.gap = "6px";
+    row.style.alignItems = "flex-start";
+
+    var icon = document.createElement("span");
+    icon.textContent = getMeasureTypeIcon((m && m.type) || "");
+    icon.style.marginTop = "1px";
+
+    var txt = document.createElement("span");
+    txt.textContent = (m && m.text) ? m.text : "";
+
+    row.appendChild(icon);
+    row.appendChild(txt);
+    measuresWrap.appendChild(row);
+  });
+
+  box.appendChild(measuresWrap);
+}
+
       // Colour badge
       var badge = document.createElement("div");
       badge.className = "diagram-color-badge";
@@ -926,7 +1023,7 @@ if (!window.requestAnimationFrame) {
       var changed = false;
 
       nodes.forEach(function (n) {
-        if (!n.autoSize) return;
+        if (!n.autoSize && !(n.measures && n.measures.length)) return;
 
         var el = canvas.querySelector('.diagram-node[data-id="' + n.id + '"]');
         if (!el) return;
@@ -1735,7 +1832,8 @@ function downloadCsv() {
 	title_primary: columnTitles.primary,
 	title_secondary: columnTitles.secondary,
 	title_change: columnTitles.change,
-	palette_json: JSON.stringify(colorOptions || [])
+	palette_json: JSON.stringify(colorOptions || []),
+        measures_json: JSON.stringify(n.measures || [])
 
     };
   });
@@ -1772,6 +1870,17 @@ function uploadCsv(file) {
 	var titlesFromCsv = null;
 	var paletteFromCsv = null;
 
+var measures = [];
+var mj = (row.measures_json || "").toString().trim();
+if (mj) {
+  try {
+    var parsedM = JSON.parse(mj);
+    if (Array.isArray(parsedM)) measures = parsedM;
+  } catch (e) {
+    console.warn("Could not parse measures_json:", e);
+  }
+}
+
 
       rows.forEach(function (row, index) {
         var id = (row.id || "").toString().trim();
@@ -1797,7 +1906,8 @@ function uploadCsv(file) {
           text: text,
           parentId: parentId,
           color: color,
-	  autoSize: ((row.auto_size || "").toString().trim() === "1")
+	  autoSize: ((row.auto_size || "").toString().trim() === "1"),
+          measures: measures
         });
 
         // Parse extra parents into an array of IDs
@@ -1836,7 +1946,6 @@ function uploadCsv(file) {
   	  titlesFromCsv = { aim: ta, primary: tp, secondary: ts, change: tc };
  	 }
 	}
-
 
         // --- NEW: appearance settings (read once, from first row that has them) ---
         if (!appearanceFromCsv) {
@@ -2235,6 +2344,16 @@ addItem("Toggle auto-size to text", function (id) {
   if (!n) return;
   n.autoSize = !n.autoSize;
   updateAllViews();
+});
+
+addItem("Add measure…", function (id) {
+  if (!id) return;
+  addMeasureToNode(id);
+});
+
+addItem("Clear measures…", function (id) {
+  if (!id) return;
+  clearMeasuresFromNode(id);
 });
 
 function addDisabledItem(label) {
