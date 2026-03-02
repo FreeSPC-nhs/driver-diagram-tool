@@ -33,12 +33,30 @@ var nodeContextMenuEl = null;
 var contextNodeId = null;
 var nodeContextSubmenuEl = null; // NEW: holds the colour submenu element
 
-// --- Auto-size measurement cache (prevents "extra gap") ---
-var measuredAutoHeightsById = {};
+// --- Auto-size measurement cache ---
+// We must track the box height separately from the whole item height (box + measures),
+// otherwise measures get counted twice and create extra gaps.
+var measuredBoxHeightsById = {};   // height of the coloured box only
+var measuredItemHeightsById = {};  // height of the whole wrapper (box + measures)
 var suppressAutosizeRelayout = false;
 
 // Level ordering for parent/child logic
 var levelOrder = ["aim", "primary", "secondary", "change"];
+
+// -------------------- Measures: types + colour coding --------------------
+var measureTypes = [
+  { value: "outcome",   label: "Outcome measure",   icon: "●", color: "#b91c1c" },
+  { value: "process",   label: "Process measure",   icon: "●", color: "#15803d" },
+  { value: "balancing", label: "Balancing measure", icon: "●", color: "#1d4ed8" },
+  { value: "none",      label: "No type",           icon: "•", color: "#6b7280" }
+];
+
+function getMeasureTypeMeta(type) {
+  var t = (type || "").toString().trim().toLowerCase();
+  var found = measureTypes.find(function (m) { return m.value === t; });
+  return found || measureTypes[measureTypes.length - 1]; // default "none"
+}
+// ------------------------------------------------------------------------
 
 function getPreviousLevel(level) {
   var idx = levelOrder.indexOf(level);
@@ -102,40 +120,351 @@ function rebuildConnectionsFromParents() {
 
 
 function getMeasureTypeLabel(t) {
-  if (t === "outcome") return "Outcome";
-  if (t === "process") return "Process";
-  if (t === "balancing") return "Balancing";
-  return "Measure";
+  return getMeasureTypeMeta(t).label;
 }
 
 function getMeasureTypeIcon(t) {
-  // simple, font-safe icons
-  if (t === "outcome") return "●";
-  if (t === "process") return "◐";
-  if (t === "balancing") return "◑";
-  return "•";
+  return getMeasureTypeMeta(t).icon;
 }
 
 function addMeasureToNode(nodeId) {
   var n = nodes.find(function (x) { return x.id === nodeId; });
   if (!n) return;
 
-  var type = window.prompt("Measure type: outcome / process / balancing", "process");
-  if (type === null) return;
-  type = (type || "").trim().toLowerCase();
-  if (!type) type = "process";
+  // ---- Build a small modal dialog ----
+  var overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.left = "0";
+  overlay.style.top = "0";
+  overlay.style.right = "0";
+  overlay.style.bottom = "0";
+  overlay.style.background = "rgba(0,0,0,0.25)";
+  overlay.style.zIndex = "20000";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) document.body.removeChild(overlay);
+  });
 
-  var text = window.prompt("Measure text:", "");
-  if (text === null) return;
-  text = (text || "").trim();
-  if (!text) return;
+  var dialog = document.createElement("div");
+  dialog.style.width = "min(420px, calc(100vw - 24px))";
+  dialog.style.background = "#fff";
+  dialog.style.border = "1px solid #d0d7de";
+  dialog.style.borderRadius = "12px";
+  dialog.style.boxShadow = "0 14px 40px rgba(0,0,0,0.18)";
+  dialog.style.padding = "14px";
+  dialog.style.fontSize = "14px";
+  dialog.style.color = "#111";
+  dialog.addEventListener("click", function (e) { e.stopPropagation(); });
 
-  if (!Array.isArray(n.measures)) n.measures = [];
-  n.measures.push({ type: type, text: text });
+  var title = document.createElement("div");
+  title.textContent = "Add measure";
+  title.style.fontWeight = "700";
+  title.style.marginBottom = "10px";
+  dialog.appendChild(title);
 
-  // measures usually need space: turn on autoSize automatically (optional but recommended)
-  n.autoSize = true;
+  // Type row
+  var typeRow = document.createElement("div");
+  typeRow.style.display = "grid";
+  typeRow.style.gridTemplateColumns = "120px 1fr";
+  typeRow.style.gap = "10px";
+  typeRow.style.alignItems = "center";
+  typeRow.style.marginBottom = "10px";
 
+  var typeLabel = document.createElement("div");
+  typeLabel.textContent = "Measure type";
+  typeLabel.style.color = "#374151";
+  typeRow.appendChild(typeLabel);
+
+  var typeSelect = document.createElement("select");
+  typeSelect.style.padding = "8px 10px";
+  typeSelect.style.borderRadius = "8px";
+  typeSelect.style.border = "1px solid #d0d7de";
+  typeSelect.style.fontSize = "14px";
+
+  measureTypes.forEach(function (m) {
+    var opt = document.createElement("option");
+    opt.value = m.value;
+    opt.textContent = m.label;
+    typeSelect.appendChild(opt);
+  });
+
+  // default selection
+  typeSelect.value = "process";
+  typeRow.appendChild(typeSelect);
+
+  dialog.appendChild(typeRow);
+
+  // Text row
+  var textRow = document.createElement("div");
+  textRow.style.display = "grid";
+  textRow.style.gridTemplateColumns = "120px 1fr";
+  textRow.style.gap = "10px";
+  textRow.style.alignItems = "start";
+  textRow.style.marginBottom = "12px";
+
+  var textLabel = document.createElement("div");
+  textLabel.textContent = "Measure text";
+  textLabel.style.color = "#374151";
+  textRow.appendChild(textLabel);
+
+  var textInput = document.createElement("textarea");
+  textInput.rows = 3;
+  textInput.placeholder = "e.g. Time to respond (within timeframe)";
+  textInput.style.width = "100%";
+  textInput.style.padding = "8px 10px";
+  textInput.style.borderRadius = "8px";
+  textInput.style.border = "1px solid #d0d7de";
+  textInput.style.fontSize = "14px";
+  textInput.style.resize = "vertical";
+  textRow.appendChild(textInput);
+
+  dialog.appendChild(textRow);
+
+  // Buttons
+  var btnRow = document.createElement("div");
+  btnRow.style.display = "flex";
+  btnRow.style.justifyContent = "flex-end";
+  btnRow.style.gap = "8px";
+
+  var cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.style.padding = "8px 12px";
+  cancelBtn.style.borderRadius = "8px";
+  cancelBtn.style.border = "1px solid #d0d7de";
+  cancelBtn.style.background = "#fff";
+  cancelBtn.style.cursor = "pointer";
+  cancelBtn.addEventListener("click", function () {
+    document.body.removeChild(overlay);
+  });
+
+  var addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.textContent = "Add";
+  addBtn.style.padding = "8px 12px";
+  addBtn.style.borderRadius = "8px";
+  addBtn.style.border = "1px solid #1f2937";
+  addBtn.style.background = "#111";
+  addBtn.style.color = "#fff";
+  addBtn.style.cursor = "pointer";
+
+  addBtn.addEventListener("click", function () {
+    var type = (typeSelect.value || "none").toString().trim().toLowerCase();
+    var text = (textInput.value || "").toString().trim();
+
+    if (!text) {
+      alert("Please enter some measure text.");
+      return;
+    }
+
+    if (!Array.isArray(n.measures)) n.measures = [];
+    n.measures.push({ type: type, text: text });
+
+    // measures usually need space: turn on autoSize automatically
+    n.autoSize = true;
+
+    document.body.removeChild(overlay);
+    updateAllViews();
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(addBtn);
+  dialog.appendChild(btnRow);
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  // Put cursor in the text box straight away
+  setTimeout(function () { textInput.focus(); }, 0);
+
+  // Allow Escape to close
+  function escHandler(e) {
+    if (e.key === "Escape") {
+      if (overlay.parentNode) document.body.removeChild(overlay);
+      document.removeEventListener("keydown", escHandler);
+    }
+  }
+  document.addEventListener("keydown", escHandler);
+}
+
+function editMeasureOnNode(nodeId, measureIndex) {
+  var n = nodes.find(function (x) { return x.id === nodeId; });
+  if (!n) return;
+  if (!Array.isArray(n.measures) || !n.measures.length) {
+    alert("This item has no measures to edit.");
+    return;
+  }
+  var m = n.measures[measureIndex];
+  if (!m) return;
+
+  // ---- Build a small modal dialog (same style as addMeasureToNode) ----
+  var overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.left = "0";
+  overlay.style.top = "0";
+  overlay.style.right = "0";
+  overlay.style.bottom = "0";
+  overlay.style.background = "rgba(0,0,0,0.25)";
+  overlay.style.zIndex = "20000";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) document.body.removeChild(overlay);
+  });
+
+  var dialog = document.createElement("div");
+  dialog.style.width = "min(420px, calc(100vw - 24px))";
+  dialog.style.background = "#fff";
+  dialog.style.border = "1px solid #d0d7de";
+  dialog.style.borderRadius = "12px";
+  dialog.style.boxShadow = "0 14px 40px rgba(0,0,0,0.18)";
+  dialog.style.padding = "14px";
+  dialog.style.fontSize = "14px";
+  dialog.style.color = "#111";
+  dialog.addEventListener("click", function (e) { e.stopPropagation(); });
+
+  var title = document.createElement("div");
+  title.textContent = "Edit measure";
+  title.style.fontWeight = "700";
+  title.style.marginBottom = "10px";
+  dialog.appendChild(title);
+
+  // Type row
+  var typeRow = document.createElement("div");
+  typeRow.style.display = "grid";
+  typeRow.style.gridTemplateColumns = "120px 1fr";
+  typeRow.style.gap = "10px";
+  typeRow.style.alignItems = "center";
+  typeRow.style.marginBottom = "10px";
+
+  var typeLabel = document.createElement("div");
+  typeLabel.textContent = "Measure type";
+  typeLabel.style.color = "#374151";
+  typeRow.appendChild(typeLabel);
+
+  var typeSelect = document.createElement("select");
+  typeSelect.style.padding = "8px 10px";
+  typeSelect.style.borderRadius = "8px";
+  typeSelect.style.border = "1px solid #d0d7de";
+  typeSelect.style.fontSize = "14px";
+
+  measureTypes.forEach(function (mt) {
+    var opt = document.createElement("option");
+    opt.value = mt.value;
+    opt.textContent = mt.label;
+    typeSelect.appendChild(opt);
+  });
+
+  // default selection = current measure's type
+  typeSelect.value = (m.type || "none").toString().trim().toLowerCase();
+  typeRow.appendChild(typeSelect);
+  dialog.appendChild(typeRow);
+
+  // Text row
+  var textRow = document.createElement("div");
+  textRow.style.display = "grid";
+  textRow.style.gridTemplateColumns = "120px 1fr";
+  textRow.style.gap = "10px";
+  textRow.style.alignItems = "start";
+  textRow.style.marginBottom = "12px";
+
+  var textLabel = document.createElement("div");
+  textLabel.textContent = "Measure text";
+  textLabel.style.color = "#374151";
+  textRow.appendChild(textLabel);
+
+  var textInput = document.createElement("textarea");
+  textInput.rows = 3;
+  textInput.style.width = "100%";
+  textInput.style.padding = "8px 10px";
+  textInput.style.borderRadius = "8px";
+  textInput.style.border = "1px solid #d0d7de";
+  textInput.style.fontSize = "14px";
+  textInput.style.resize = "vertical";
+  textInput.value = (m.text || "").toString();
+  textRow.appendChild(textInput);
+
+  dialog.appendChild(textRow);
+
+  // Buttons
+  var btnRow = document.createElement("div");
+  btnRow.style.display = "flex";
+  btnRow.style.justifyContent = "flex-end";
+  btnRow.style.gap = "8px";
+
+  var cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.style.padding = "8px 12px";
+  cancelBtn.style.borderRadius = "8px";
+  cancelBtn.style.border = "1px solid #d0d7de";
+  cancelBtn.style.background = "#fff";
+  cancelBtn.style.cursor = "pointer";
+  cancelBtn.addEventListener("click", function () {
+    document.body.removeChild(overlay);
+  });
+
+  var saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.textContent = "Save";
+  saveBtn.style.padding = "8px 12px";
+  saveBtn.style.borderRadius = "8px";
+  saveBtn.style.border = "1px solid #1f2937";
+  saveBtn.style.background = "#111";
+  saveBtn.style.color = "#fff";
+  saveBtn.style.cursor = "pointer";
+
+  saveBtn.addEventListener("click", function () {
+    var type = (typeSelect.value || "none").toString().trim().toLowerCase();
+    var text = (textInput.value || "").toString().trim();
+
+    if (!text) {
+      alert("Please enter some measure text.");
+      return;
+    }
+
+    m.type = type;
+    m.text = text;
+
+    document.body.removeChild(overlay);
+    updateAllViews();
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(saveBtn);
+  dialog.appendChild(btnRow);
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  setTimeout(function () { textInput.focus(); }, 0);
+
+  function escHandler(e) {
+    if (e.key === "Escape") {
+      if (overlay.parentNode) document.body.removeChild(overlay);
+      document.removeEventListener("keydown", escHandler);
+    }
+  }
+  document.addEventListener("keydown", escHandler);
+}
+
+function deleteMeasureOnNode(nodeId, measureIndex) {
+  var n = nodes.find(function (x) { return x.id === nodeId; });
+  if (!n) return;
+  if (!Array.isArray(n.measures) || !n.measures.length) {
+    alert("This item has no measures to delete.");
+    return;
+  }
+  var m = n.measures[measureIndex];
+  if (!m) return;
+
+  var msg = "Delete this measure?\n\n" + (m.text || "");
+  if (!window.confirm(msg)) return;
+
+  n.measures.splice(measureIndex, 1);
   updateAllViews();
 }
 
@@ -719,26 +1048,29 @@ var fs  = diagramAppearance && diagramAppearance.fontSize ? diagramAppearance.fo
 // Use the column stack width if available; fall back to a sensible number.
 var heightById = {};
 nodes.forEach(function (n) {
-  // 1) Height of the coloured box itself
-  var boxHeightForThisNode;
+  // If we already measured the whole wrapper (box + measures), use that.
+  if (measuredItemHeightsById && measuredItemHeightsById[n.id]) {
+    heightById[n.id] = measuredItemHeightsById[n.id];
+    return;
+  }
 
+  // Otherwise estimate:
+  // 1) coloured box height
+  var boxHeightForThisNode;
   if (n.autoSize) {
-    // Prefer measured height if we have it
-    if (measuredAutoHeightsById && measuredAutoHeightsById[n.id]) {
-      boxHeightForThisNode = measuredAutoHeightsById[n.id];
+    if (measuredBoxHeightsById && measuredBoxHeightsById[n.id]) {
+      boxHeightForThisNode = measuredBoxHeightsById[n.id];
     } else {
-      // First pass rough estimate; corrected after render by measuring
       boxHeightForThisNode = estimateAutoHeightPx((n.text || ""), fs, 320, boxH);
     }
   } else {
     boxHeightForThisNode = boxH;
   }
 
-  // 2) Extra height needed UNDER the box for measures (in white space)
+  // 2) measures height (white space below box)
   var measuresFont = Math.max(10, fs - 3);
   var measuresHeightForThisNode = estimateMeasuresHeightPx(n.measures, measuresFont);
 
-  // Total height (box + measures underneath)
   heightById[n.id] = boxHeightForThisNode + measuresHeightForThisNode;
 });
 
@@ -986,9 +1318,13 @@ if (node.measures && node.measures.length) {
     row.style.gap = "6px";
     row.style.alignItems = "flex-start";
 
+    var meta = getMeasureTypeMeta((m && m.type) || "");
+
     var icon = document.createElement("span");
-    icon.textContent = getMeasureTypeIcon((m && m.type) || "");
+    icon.textContent = meta.icon;
     icon.style.marginTop = "1px";
+    icon.style.color = meta.color;
+    icon.title = meta.label;
 
     var txt = document.createElement("span");
     txt.textContent = (m && m.text) ? m.text : "";
@@ -1018,27 +1354,40 @@ if (!window.requestAnimationFrame) {
       var changed = false;
 
       nodes.forEach(function (n) {
-        if (!n.autoSize && !(n.measures && n.measures.length)) return;
+  // We only need to measure if:
+  // - autoSize is on (box can change height), OR
+  // - measures exist (wrapper can change height)
+  if (!n.autoSize && !(n.measures && n.measures.length)) return;
 
-        var el = canvas.querySelector('.diagram-item[data-id="' + n.id + '"]');
-        if (!el) return;
+  var itemEl = canvas.querySelector('.diagram-item[data-id="' + n.id + '"]');
+  if (!itemEl) return;
 
-        // Real rendered height (includes wrapping)
-        var h = el.offsetHeight;
+  var boxEl = itemEl.querySelector('.diagram-node[data-id="' + n.id + '"]');
+  if (!boxEl) return;
 
-        // Clamp to at least the global base box height
-        var minH =
-          (diagramAppearance && diagramAppearance.boxHeight)
-            ? diagramAppearance.boxHeight
-            : 32;
+  // Measure coloured box height (text wrapping etc.)
+  var boxHReal = boxEl.offsetHeight;
 
-        if (h < minH) h = minH;
+  // Measure wrapper height (box + measures underneath)
+  var itemHReal = itemEl.offsetHeight;
 
-        if (measuredAutoHeightsById[n.id] !== h) {
-          measuredAutoHeightsById[n.id] = h;
-          changed = true;
-        }
-      });
+  // Clamp to at least the global base box height
+  var minH =
+    (diagramAppearance && diagramAppearance.boxHeight)
+      ? diagramAppearance.boxHeight
+      : 32;
+
+  if (boxHReal < minH) boxHReal = minH;
+  if (itemHReal < minH) itemHReal = minH;
+
+  var boxChanged = (measuredBoxHeightsById[n.id] !== boxHReal);
+  var itemChanged = (measuredItemHeightsById[n.id] !== itemHReal);
+
+  if (boxChanged) measuredBoxHeightsById[n.id] = boxHReal;
+  if (itemChanged) measuredItemHeightsById[n.id] = itemHReal;
+
+  if (boxChanged || itemChanged) changed = true;
+});
 
       // If anything changed, run a second render using measured heights
       if (changed) {
@@ -2336,6 +2685,54 @@ addItem("Toggle auto-size to text", function (id) {
 addItem("Add measure…", function (id) {
   if (!id) return;
   addMeasureToNode(id);
+});
+
+addItem("Edit measure…", function (id) {
+  if (!id) return;
+  var n = nodes.find(function (x) { return x.id === id; });
+  if (!n || !n.measures || !n.measures.length) {
+    alert("No measures to edit on this item.");
+    return;
+  }
+
+  var list = n.measures.map(function (m, i) {
+    return (i + 1) + ") " + (m.text || "");
+  }).join("\n");
+
+  var pick = window.prompt("Enter the measure number to edit:\n\n" + list, "1");
+  if (pick === null) return;
+
+  var idx = parseInt(pick, 10) - 1;
+  if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
+    alert("That number is not valid.");
+    return;
+  }
+
+  editMeasureOnNode(id, idx);
+});
+
+addItem("Delete measure…", function (id) {
+  if (!id) return;
+  var n = nodes.find(function (x) { return x.id === id; });
+  if (!n || !n.measures || !n.measures.length) {
+    alert("No measures to delete on this item.");
+    return;
+  }
+
+  var list = n.measures.map(function (m, i) {
+    return (i + 1) + ") " + (m.text || "");
+  }).join("\n");
+
+  var pick = window.prompt("Enter the measure number to delete:\n\n" + list, "1");
+  if (pick === null) return;
+
+  var idx = parseInt(pick, 10) - 1;
+  if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
+    alert("That number is not valid.");
+    return;
+  }
+
+  deleteMeasureOnNode(id, idx);
 });
 
 addItem("Clear measures…", function (id) {
