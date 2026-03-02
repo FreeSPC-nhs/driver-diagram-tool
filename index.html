@@ -655,114 +655,96 @@
 
     <h2 id="helpModalTitle">Help & information</h2>
 
-    <h3>Using this tool</h3>
+    <h3>What this tool does</h3>
     <p>
-      This web-based driver diagram tool lets you create and edit a structured driver diagram made up of an
+      This tool helps you build and maintain a driver diagram made up of an
       <strong>Aim</strong>, <strong>Primary drivers</strong>, <strong>Secondary drivers</strong>,
-      and <strong>Change ideas</strong>.
-      The diagram updates instantly as you edit, reorder, colour, or resize items.
+      and <strong>Change ideas</strong>. You can also add <strong>measures</strong> to any item to record
+      how you will track progress.
     </p>
 
     <p class="faq-question">1. Understanding the diagram structure</p>
     <ul>
       <li><strong>Aim</strong>: the overall goal you are trying to achieve (left-hand column).</li>
-      <li><strong>Primary drivers</strong>: the main factors that directly contribute to the aim.</li>
+      <li><strong>Primary drivers</strong>: main factors that directly contribute to the aim.</li>
       <li><strong>Secondary drivers</strong>: factors that influence the primary drivers.</li>
-      <li><strong>Change ideas</strong>: specific actions or tests of change that influence drivers.</li>
+      <li><strong>Change ideas</strong>: actions or tests of change that influence drivers.</li>
     </ul>
-
     <p>
-      The diagram shows cause and effect from right to left: if we implement these
-      <strong>change ideas</strong>, they influence our
-      <strong>secondary and primary drivers</strong>, which together help us achieve the
-      <strong>aim</strong>.
+      The diagram shows cause and effect from right to left: change ideas influence secondary drivers,
+      which influence primary drivers, which help achieve the aim.
     </p>
 
     <p class="faq-question">2. Adding items</p>
     <ul>
-      <li>Use the <strong>+ buttons</strong> on any box to add a child item at the next level.</li>
-      <li>New items automatically appear in the correct column and connect to their parent.</li>
-      <li>You can also add items from the controls panel if preferred.</li>
+      <li>Use the <strong>+ button</strong> on any box to add a child item at the next level.</li>
+      <li>New items appear in the correct column and connect automatically to their parent.</li>
+      <li>New child items inherit their parent’s colour (if one is set).</li>
     </ul>
 
-    <p class="faq-question">3. Editing items</p>
+    <p class="faq-question">3. Editing text and headings</p>
     <ul>
-      <li>Click directly on an item’s text to edit it.</li>
-      <li>Right-click (or use the context menu) on any item for more options.</li>
-      <li>You can edit column headings by clicking on the heading text.</li>
+      <li><strong>Item text</strong>: click the text in a box to edit it.</li>
+      <li><strong>Column headings</strong>: click a heading (e.g. “Primary drivers”) to rename it.</li>
     </ul>
 
-    <p class="faq-question">4. Reordering items</p>
+    <p class="faq-question">4. Right-click menu (advanced actions)</p>
     <ul>
-      <li>Right-click an item and use <strong>Move up</strong>, <strong>Move down</strong>,
-          <strong>Move to top</strong>, or <strong>Move to bottom</strong>.</li>
-      <li>Items are reordered within their level and parent group.</li>
-      <li>The diagram automatically redraws to maintain correct branch alignment.</li>
+      <li>Right-click any item to open its menu.</li>
+      <li><strong>Toggle auto-size to text</strong>: makes the box expand to fit longer text.</li>
+      <li><strong>Organise ▸</strong>: move an item up/down (or to top/bottom) within its parent group.</li>
+      <li><strong>Change colour ▸</strong>: apply one of your saved palette colours.</li>
+      <li><strong>Delete…</strong>: deletes the item and any dependent child items.</li>
     </ul>
 
-    <p class="faq-question">5. Auto-sizing boxes</p>
+    <p class="faq-question">5. Measures (Outcome / Process / Balancing)</p>
     <ul>
-      <li>If text is long, right-click the item and choose
-          <strong>Toggle auto-size to text</strong>.</li>
-      <li>The box will expand vertically to fit its content.</li>
-      <li>The diagram layout automatically adjusts so connections remain aligned.</li>
+      <li>Right-click an item and choose <strong>Measures ▸</strong> to add, edit, delete, or clear measures.</li>
+      <li>Measures appear <strong>below the box</strong> (outside the coloured area).</li>
+      <li>Each measure type has a colour in the <strong>Measures key</strong> shown in the legend.</li>
+      <li>Adding measures typically enables <strong>auto-size</strong> so spacing remains correct.</li>
     </ul>
 
-    <p class="faq-question">6. Using colours</p>
+    <p class="faq-question">6. Connections (including extra links)</p>
     <ul>
-      <li>Add, rename, or delete colours in the colour management panel.</li>
-      <li>Right-click any box and use <strong>Change colour ▸</strong> to select from your defined colours.</li>
-      <li>Colours can help group themes, workstreams, priorities, or ownership.</li>
-      <li>The legend updates automatically to reflect your palette.</li>
+      <li>Items connect automatically to their parent when you add them.</li>
+      <li>Use the <strong>📌 connector button</strong> to add or remove additional connections to the previous level.</li>
+      <li>This lets you show relationships that don’t fit a single “parent” link.</li>
     </ul>
 
-    <p class="faq-question">7. Connections and structure</p>
+    <p class="faq-question">7. Colours and legend</p>
     <ul>
-      <li>Items are connected automatically to their parent.</li>
-      <li>You can add or remove additional connections using the connector button.</li>
-      <li>The diagram maintains parent–child structure while allowing flexible linking.</li>
+      <li>Create your own colour palette in <strong>Colour options</strong> (left panel).</li>
+      <li>Apply colours via <strong>Change colour ▸</strong> on the right-click menu.</li>
+      <li>The <strong>Legend</strong> updates automatically to reflect your saved palette and the measures key.</li>
+      <li>You can hide/show the legend using the header button.</li>
     </ul>
 
-    <p class="faq-question">8. Deleting items</p>
+    <p class="faq-question">8. Appearance settings (look & layout)</p>
     <ul>
-      <li>Right-click an item and choose <strong>Delete…</strong>.</li>
-      <li>Deleting an item also removes its dependent child items.</li>
-      <li>Connections associated with deleted items are removed automatically.</li>
+      <li>Adjust <strong>box height</strong>, <strong>vertical gap</strong>, <strong>font size</strong>, <strong>font family</strong>, and <strong>bold text</strong>.</li>
+      <li>These settings change the visual layout only (not the underlying data).</li>
+      <li>Auto-sized boxes may grow beyond the base height if needed.</li>
     </ul>
 
-    <p class="faq-question">9. Appearance settings</p>
+    <p class="faq-question">9. Saving and exporting</p>
     <ul>
-      <li>Adjust box height, vertical spacing, font size, font family, and bold styling.</li>
-      <li>Appearance settings apply globally to the diagram.</li>
-      <li>Auto-sized boxes will expand beyond the base height if needed.</li>
+      <li><strong>Save as CSV</strong>: saves items, hierarchy, colours, extra connections, headings, appearance settings, and measures.</li>
+      <li><strong>Upload CSV</strong>: restores the full diagram from a previously saved file.</li>
+      <li><strong>Export PNG/PDF</strong>: exports the diagram area (including legend and measures) for reports and presentations.</li>
+      <li>Export automatically hides editing controls (badges/buttons) for a clean image.</li>
     </ul>
-
-    <p class="faq-question">10. Exporting and saving</p>
-    <ul>
-      <li>Export as <strong>PNG</strong> for presentations or reports.</li>
-      <li>Export as <strong>PDF</strong> for sharing or printing.</li>
-      <li>Download and upload <strong>CSV files</strong> to save your work.</li>
-      <li>CSV export preserves structure, colours, appearance settings, and layout order.</li>
-    </ul>
-
-    <p>
-      This tool is designed to support continuous learning. As you test change ideas and review
-      data (for example using run charts or SPC), you can update the diagram to reflect your
-      latest understanding.
-    </p>
 
     <h3>Further information</h3>
-
     <p>
-      If you would like to learn more about driver diagrams and how they are used in
-      quality improvement, the following resources provide clear and authoritative guidance:
+      If you would like to learn more about driver diagrams and how they are used in quality improvement,
+      the following resources provide clear guidance:
     </p>
 
     <ul>
       <li>
         <a href="https://www.england.nhs.uk/improvement-hub/wp-content/uploads/sites/44/2018/06/An-example-of-driver-diagrams-1.pdf"
-           target="_blank"
-           rel="noopener">
+           target="_blank" rel="noopener">
           <strong>NHS England – Driver diagrams</strong>
         </a><br>
         Practical NHS guidance on creating and using driver diagrams in quality improvement work.
@@ -770,17 +752,15 @@
 
       <li>
         <a href="https://www.ihi.org/resources/Pages/Tools/Driver-Diagram.aspx"
-           target="_blank"
-           rel="noopener">
+           target="_blank" rel="noopener">
           <strong>Institute for Healthcare Improvement (IHI) – Driver Diagrams</strong>
         </a><br>
-        A widely recognised international reference explaining the purpose and structure of driver diagrams.
+        International reference explaining the purpose and structure of driver diagrams.
       </li>
 
       <li>
         <a href="https://www.ihi.org/resources/Pages/HowtoImprove/default.aspx"
-           target="_blank"
-           rel="noopener">
+           target="_blank" rel="noopener">
           <strong>The Model for Improvement</strong>
         </a><br>
         Background reading on how driver diagrams fit alongside PDSA cycles and measurement.
@@ -788,12 +768,12 @@
     </ul>
 
     <p>
-      These resources can help you get the most value from this tool.
+      This tool is designed to support continuous learning. As you test change ideas and review data,
+      you can update the diagram to reflect your latest understanding.
     </p>
 
   </div>
-</div>
-  <script src="driver.js"></script>
+</div>  <script src="driver.js"></script>
 </body>
 </html>
 
