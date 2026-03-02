@@ -730,39 +730,6 @@ function rebuildColorOptionsFromNodes() {
   renderColorOptionsList();
 }
 
-function deleteColorOptionByValue(value) {
-  if (!value) return;
-
-  var opt = colorOptions.find(function (c) {
-    return c.value.toLowerCase() === value.toLowerCase();
-  });
-  if (!opt) return;
-
-  if (!window.confirm('Delete colour "' + opt.label + '"?')) return;
-
-  // remove from palette
-  colorOptions = colorOptions.filter(function (c) {
-    return c.value.toLowerCase() !== value.toLowerCase();
-  });
-
-  // remove from any nodes using it
-  nodes.forEach(function (n) {
-    if ((n.color || "").toLowerCase() === value.toLowerCase()) {
-      n.color = "";
-    }
-  });
-
-  // stop editing if we deleted the one being edited
-  if (editingColorValue && editingColorValue.toLowerCase() === value.toLowerCase()) {
-    editingColorValue = null;
-    var labelInput = document.getElementById("colorLabelInput");
-    if (labelInput) labelInput.value = "";
-  }
-
-  updateAllViews();
-}
-
-
 
 // Convert hex colour to { r, g, b }
 function hexToRgb(hex) {
