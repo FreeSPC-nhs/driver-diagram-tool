@@ -829,24 +829,7 @@ function renderLegend() {
 } else {
   emptyMsg.style.display = "none";
 
-  colorOptions.forEach(function (opt) {
-    var li = document.createElement("li");
-    li.className = "legend-item";
-
-    var swatch = document.createElement("span");
-    swatch.className = "legend-color-swatch";
-    swatch.style.backgroundColor = opt.value;
-
-    var labelSpan = document.createElement("span");
-    labelSpan.textContent = opt.label;
-
-    li.appendChild(swatch);
-    li.appendChild(labelSpan);
-    list.appendChild(li);
-  });
-}
-
-  colorOptions.forEach(function (opt) {
+    colorOptions.forEach(function (opt) {
     var li = document.createElement("li");
     li.className = "legend-item";
 
@@ -864,10 +847,10 @@ function renderLegend() {
 
 // ---- Measure type key ----
 var keyTitle = document.createElement("div");
-keyTitle.textContent = "Measure key";
+keyTitle.textContent = "Measures key";
 keyTitle.style.marginTop = "10px";
 keyTitle.style.fontWeight = "600";
-keyTitle.style.fontSize = "12px";
+keyTitle.style.fontSize = "14px";
 keyTitle.style.color = "#111";
 list.appendChild(keyTitle);
 
