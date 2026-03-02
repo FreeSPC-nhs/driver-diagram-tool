@@ -235,6 +235,7 @@ function addMeasureToNode(nodeId) {
   cancelBtn.style.borderRadius = "8px";
   cancelBtn.style.border = "1px solid #d0d7de";
   cancelBtn.style.background = "#fff";
+  cancelBtn.style.color = "#111";   
   cancelBtn.style.cursor = "pointer";
   cancelBtn.addEventListener("click", function () {
     document.body.removeChild(overlay);
@@ -402,6 +403,7 @@ function editMeasureOnNode(nodeId, measureIndex) {
   cancelBtn.style.borderRadius = "8px";
   cancelBtn.style.border = "1px solid #d0d7de";
   cancelBtn.style.background = "#fff";
+  cancelBtn.style.color = "#111";   
   cancelBtn.style.cursor = "pointer";
   cancelBtn.addEventListener("click", function () {
     document.body.removeChild(overlay);
@@ -1671,78 +1673,6 @@ function insertAfterLastSibling(nodes, newNode) {
   else nodes.splice(insertAt + 1, 0, newNode);
 }
 
-function renderNodesTable() {
-  var tableWrapper = document.getElementById("nodesTableWrapper");
-  var tbody = document.getElementById("nodesTableBody");
-  var noItemsMessage = document.getElementById("noItemsMessage");
-
-  if (!tableWrapper || !tbody || !noItemsMessage) return;
-
-  tbody.innerHTML = "";
-
-  if (nodes.length === 0) {
-    tableWrapper.style.display = "none";
-    noItemsMessage.style.display = "block";
-    return;
-  }
-
-  // Only show table if tableVisible
-  if (!tableVisible) {
-    tableWrapper.style.display = "none";
-  } else {
-    tableWrapper.style.display = "block";
-  }
-  noItemsMessage.style.display = "none";
-
-  nodes.forEach(function (node) {
-    var tr = document.createElement("tr");
-
-    var tdId = document.createElement("td");
-    tdId.textContent = node.id;
-    tr.appendChild(tdId);
-
-    var tdLevel = document.createElement("td");
-    tdLevel.textContent = getLevelLabel(node.level);
-    tr.appendChild(tdLevel);
-
-    // Colour column
-    var tdColor = document.createElement("td");
-    tdColor.appendChild(createColorSelectForNode(node));
-    tr.appendChild(tdColor);
-
-    var tdParent = document.createElement("td");
-    if (node.parentId) {
-      var parent = nodes.find(function (n) {
-        return n.id === node.parentId;
-      });
-      tdParent.textContent = parent
-        ? "[" + parent.id + "] " + getLevelLabel(parent.level)
-        : "(Missing: " + node.parentId + ")";
-    } else {
-      tdParent.textContent = "—";
-    }
-    tr.appendChild(tdParent);
-
-    var tdText = document.createElement("td");
-    tdText.textContent = node.text;
-    tr.appendChild(tdText);
-
-    var tdActions = document.createElement("td");
-    var delBtn = document.createElement("button");
-    delBtn.textContent = "Delete";
-    delBtn.className = "danger";
-    delBtn.style.padding = "0.25rem 0.5rem";
-    delBtn.style.fontSize = "0.8rem";
-    delBtn.addEventListener("click", function () {
-      deleteNode(node.id);
-    });
-    tdActions.appendChild(delBtn);
-    tr.appendChild(tdActions);
-
-    tbody.appendChild(tr);
-  });
-}
-
 function setupCollapsibleSections() {
   var panel = document.getElementById("controlsPanel");
   if (!panel) return;
@@ -2453,14 +2383,6 @@ function toggleControlsVisibility() {
   }
 }
 
-function toggleTableVisibility() {
-  var btn = document.getElementById("btnToggleTable");
-  if (!btn) return;
-
-  tableVisible = !tableVisible;
-  btn.textContent = tableVisible ? "Hide table" : "Show table";
-  updateAllViews();
-}
 
 // Helper: temporarily replace the live SVG with an <img> snapshot
 // so html2canvas / html2pdf capture lines reliably.
@@ -3191,8 +3113,6 @@ document.addEventListener("DOMContentLoaded", function () {
   var addColorBtn = document.getElementById("addColorBtn");
 
   var btnToggleControls = document.getElementById("btnToggleControls");
-  var btnToggleTable = document.getElementById("btnToggleTable");
-  if (btnToggleTable) btnToggleTable.textContent = "Show table";
   var btnHeaderClear = document.getElementById("btnHeaderClear");
   var btnExportPng = document.getElementById("btnExportPng");
   var btnExportPdf = document.getElementById("btnExportPdf");
@@ -3229,9 +3149,7 @@ if (exportArea) {
   if (btnToggleControls) {
     btnToggleControls.addEventListener("click", toggleControlsVisibility);
   }
-  if (btnToggleTable) {
-    btnToggleTable.addEventListener("click", toggleTableVisibility);
-  }
+  
   if (btnHeaderClear) {
     btnHeaderClear.addEventListener("click", clearAllNodes);
   }
