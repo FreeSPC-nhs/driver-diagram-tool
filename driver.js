@@ -844,6 +844,7 @@ function renderLegend() {
     li.appendChild(labelSpan);
     list.appendChild(li);
   });
+}
 
 // ---- Measure type key ----
 var keyTitle = document.createElement("div");
