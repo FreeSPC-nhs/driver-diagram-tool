@@ -669,6 +669,16 @@ function estimateAutoHeightPx(text, fontSizePx, boxWidthPx, baseBoxHeightPx) {
   return Math.max(baseBoxHeightPx, h);
 }
 
+function estimateMeasuresHeightPx(measures, fontSizePx) {
+  if (!measures || !measures.length) return 0;
+
+  var lineH = Math.round(fontSizePx * 1.2);
+  var padTop = 6;
+  var padBottom = 2;
+
+  // assume each measure takes ~1 line (good enough; we’ll measure for real after render)
+  return padTop + measures.length * lineH + padBottom;
+}
 
 function renderDiagram() {
   var canvas = document.getElementById("diagramCanvas");
@@ -709,31 +719,27 @@ var fs  = diagramAppearance && diagramAppearance.fontSize ? diagramAppearance.fo
 // Use the column stack width if available; fall back to a sensible number.
 var heightById = {};
 nodes.forEach(function (n) {
-  // Combine node text + measures for height estimation
-  var measuresText = "";
-  if (Array.isArray(n.measures) && n.measures.length) {
-    measuresText = "\n" + n.measures.map(function (m) {
-      var t = (m && m.type) ? ("[" + m.type + "] ") : "";
-      return t + ((m && m.text) ? m.text : "");
-    }).join("\n");
-  }
+  // 1) Height of the coloured box itself
+  var boxHeightForThisNode;
 
-  var combined = (n.text || "") + measuresText;
-
-  // IMPORTANT:
-  // - If autoSize is ON, we must size by content
-  // - If measures exist, we must also reserve height even if autoSize is OFF
-  var needsExtraHeight = !!n.autoSize || (Array.isArray(n.measures) && n.measures.length);
-
-  if (!needsExtraHeight) return;
-
-  // Prefer real measured height (best). Fall back to estimate once.
-  if (measuredAutoHeightsById && measuredAutoHeightsById[n.id]) {
-    heightById[n.id] = measuredAutoHeightsById[n.id];
+  if (n.autoSize) {
+    // Prefer measured height if we have it
+    if (measuredAutoHeightsById && measuredAutoHeightsById[n.id]) {
+      boxHeightForThisNode = measuredAutoHeightsById[n.id];
+    } else {
+      // First pass rough estimate; corrected after render by measuring
+      boxHeightForThisNode = estimateAutoHeightPx((n.text || ""), fs, 320, boxH);
+    }
   } else {
-    // First pass rough estimate (fixed width guess); corrected after render by measuring
-    heightById[n.id] = estimateAutoHeightPx(combined, fs, 320, boxH);
+    boxHeightForThisNode = boxH;
   }
+
+  // 2) Extra height needed UNDER the box for measures (in white space)
+  var measuresFont = Math.max(10, fs - 3);
+  var measuresHeightForThisNode = estimateMeasuresHeightPx(n.measures, measuresFont);
+
+  // Total height (box + measures underneath)
+  heightById[n.id] = boxHeightForThisNode + measuresHeightForThisNode;
 });
 
 var layout = computeTreeLayout(byLevel, boxH, gap, heightById);
@@ -817,70 +823,75 @@ stack.style.position = "relative";
 stack.style.height = Math.ceil(layout.totalHeight) + "px";
 
     byLevel[level].forEach(function (node) {
-      var box = document.createElement("div");
-      box.className = "diagram-node level-" + level;
-      box.style.whiteSpace = "normal";
-      box.style.wordBreak = "break-word";
-      box.style.overflowWrap = "anywhere";
-      box.setAttribute("data-id", node.id);
+      // -------------- Wrapper (absolute position) --------------
+var item = document.createElement("div");
+item.className = "diagram-item";
+item.setAttribute("data-id", node.id);
 
-// Right-click context menu
-box.addEventListener("contextmenu", function (e) {
+item.style.position = "absolute";
+item.style.top = (layout.topById[node.id] != null ? layout.topById[node.id] : 0) + "px";
+item.style.left = "0px";
+item.style.right = "0px";
+
+// Right-click context menu (attach to wrapper so it works on measures too)
+item.addEventListener("contextmenu", function (e) {
   e.preventDefault();
   e.stopPropagation();
   openNodeContextMenu(node.id, e.clientX, e.clientY);
 });
 
-// --- NEW: absolute placement based on computed tree layout ---
-box.style.position = "absolute";
-box.style.top = (layout.topById[node.id] != null ? layout.topById[node.id] : 0) + "px";
-box.style.left = "0px";
-box.style.right = "0px";
+// -------------- The coloured node box (NOT absolute) --------------
+var box = document.createElement("div");
+box.className = "diagram-node level-" + level;
+box.style.whiteSpace = "normal";
+box.style.wordBreak = "break-word";
+box.style.overflowWrap = "anywhere";
+box.setAttribute("data-id", node.id);
 
-	// Apply appearance settings
-    if (diagramAppearance) {
-      var baseH = diagramAppearance.boxHeight + "px";
-	box.style.minHeight = baseH;
+// IMPORTANT: box is no longer absolute-positioned
+box.style.position = "relative";
 
-	// if measures exist, force autosize so measures are always visible
-var hasMeasures = Array.isArray(node.measures) && node.measures.length > 0;
+// Apply appearance settings
+if (diagramAppearance) {
+  var baseH = diagramAppearance.boxHeight + "px";
+  box.style.minHeight = baseH;
 
-if (node.autoSize || hasMeasures) {
-  box.style.height = "auto";
-} else {
-  box.style.height = baseH;
+  // Only autoSize affects the coloured box height now
+  if (node.autoSize) {
+    box.style.height = "auto";
+  } else {
+    box.style.height = baseH;
+  }
+
+  box.style.fontSize = diagramAppearance.fontSize + "px";
+  if (diagramAppearance.fontFamily) {
+    box.style.fontFamily = diagramAppearance.fontFamily;
+  } else {
+    box.style.fontFamily = ""; // inherit
+  }
+  box.style.fontWeight = diagramAppearance.fontBold ? "700" : "400";
 }
-      box.style.fontSize = diagramAppearance.fontSize + "px";
-      if (diagramAppearance.fontFamily) {
-        box.style.fontFamily = diagramAppearance.fontFamily;
-      } else {
-        box.style.fontFamily = ""; // inherit
-      }
-      box.style.fontWeight = diagramAppearance.fontBold ? "700" : "400"; 
 
-    }
+// Apply colour fill if set
+if (node.color) {
+  box.style.backgroundColor = node.color;
+  box.style.borderColor = "#999";
+  box.style.color = getContrastingTextColor(node.color);
+} else {
+  box.style.backgroundColor = "#ffffff";
+  box.style.borderColor = "#d0d7de";
+  box.style.color = "#000000";
+}
 
-      // Apply colour fill if set
-      if (node.color) {
-        box.style.backgroundColor = node.color;
-        box.style.borderColor = "#999";
-        box.style.color = getContrastingTextColor(node.color);
-      } else {
-        box.style.backgroundColor = "#ffffff";
-        box.style.borderColor = "#d0d7de";
-        box.style.color = "#000000";
-      }
+// Add buttons for parent/child
+var prevLevel = getPreviousLevel(level);
+var nextLevel = getNextLevel(level);
 
-      // Add buttons for parent/child
-      var prevLevel = getPreviousLevel(level);
-      var nextLevel = getNextLevel(level);
-
-	if (prevLevel && level !== "primary") {
+if (prevLevel && level !== "primary") {
   var leftBtn = document.createElement("button");
   leftBtn.type = "button";
   leftBtn.className = "diagram-add diagram-add-left";
 
-  // Size the connector to match box height
   if (diagramAppearance && diagramAppearance.boxHeight) {
     var h = diagramAppearance.boxHeight;
     leftBtn.style.height = h + "px";
@@ -889,11 +900,10 @@ if (node.autoSize || hasMeasures) {
     leftBtn.style.left = -(h / 2) + "px";
   }
 
-  // Match connector colour to node
   if (node.color) {
     leftBtn.style.backgroundColor = node.color;
     leftBtn.style.borderColor = node.color;
-    leftBtn.style.color = getContrastingTextColor(node.color); // keep symbol readable
+    leftBtn.style.color = getContrastingTextColor(node.color);
   } else {
     leftBtn.style.backgroundColor = "#ffffff";
     leftBtn.style.borderColor = "#d0d7de";
@@ -901,73 +911,74 @@ if (node.autoSize || hasMeasures) {
   }
 
   leftBtn.textContent = "📌";
-  leftBtn.title =
-    "Add or remove a connection to a " + getLevelLabel(prevLevel);
-  leftBtn.setAttribute(
-    "aria-label",
-    "Add or remove connection to " + getLevelLabel(prevLevel)
-  );
+  leftBtn.title = "Add or remove a connection to a " + getLevelLabel(prevLevel);
+  leftBtn.setAttribute("aria-label", "Add or remove connection to " + getLevelLabel(prevLevel));
 
   leftBtn.addEventListener("click", function (e) {
     e.stopPropagation();
-    handleConnectionButtonClick(node.id); // 👈 use the new manager
+    handleConnectionButtonClick(node.id);
   });
 
   box.appendChild(leftBtn);
 }
 
+if (nextLevel) {
+  var rightBtn = document.createElement("button");
+  rightBtn.type = "button";
+  rightBtn.className = "diagram-add diagram-add-right";
 
-      if (nextLevel) {
-        var rightBtn = document.createElement("button");
-        rightBtn.type = "button";
-        rightBtn.className = "diagram-add diagram-add-right";
-	// Size the connector to match box height
-        if (diagramAppearance && diagramAppearance.boxHeight) {
-          var h2 = diagramAppearance.boxHeight;
-          rightBtn.style.height = h2 + "px";
-          rightBtn.style.width = Math.round(h2 * 0.6) + "px";
-          rightBtn.style.borderRadius = (h2 / 2) + "px";
-	  rightBtn.style.right = -(h2 / 2) + "px"; 
-        }		
-	// Match connector colour to node
-	if (node.color) {
-  	rightBtn.style.backgroundColor = node.color;
-  	rightBtn.style.borderColor = node.color;
-  	rightBtn.style.color = getContrastingTextColor(node.color);
-	} else {
-  	rightBtn.style.backgroundColor = "#ffffff";
-  	rightBtn.style.borderColor = "#d0d7de";
-  	rightBtn.style.color = "#555";
-	}
-        rightBtn.textContent = "+"; // child
-        rightBtn.title = "Add " + getLevelLabel(nextLevel) + " (child)";
-        rightBtn.setAttribute("aria-label", "Add child " + getLevelLabel(nextLevel));
-        rightBtn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          addChildForNode(node.id);
-        });
-        box.appendChild(rightBtn);
-      }
+  if (diagramAppearance && diagramAppearance.boxHeight) {
+    var h2 = diagramAppearance.boxHeight;
+    rightBtn.style.height = h2 + "px";
+    rightBtn.style.width = Math.round(h2 * 0.6) + "px";
+    rightBtn.style.borderRadius = (h2 / 2) + "px";
+    rightBtn.style.right = -(h2 / 2) + "px";
+  }
 
+  if (node.color) {
+    rightBtn.style.backgroundColor = node.color;
+    rightBtn.style.borderColor = node.color;
+    rightBtn.style.color = getContrastingTextColor(node.color);
+  } else {
+    rightBtn.style.backgroundColor = "#ffffff";
+    rightBtn.style.borderColor = "#d0d7de";
+    rightBtn.style.color = "#555";
+  }
 
-      // Text content
-      var textSpan = document.createElement("span");
-      textSpan.textContent = node.text;
-      textSpan.title = "Click to edit text";
-      textSpan.addEventListener("click", function (e) {
-        e.stopPropagation();
-        editNode(node.id);
-      });
-      box.appendChild(textSpan);
+  rightBtn.textContent = "+";
+  rightBtn.title = "Add " + getLevelLabel(nextLevel) + " (child)";
+  rightBtn.setAttribute("aria-label", "Add child " + getLevelLabel(nextLevel));
 
-// Measures (optional) - shown beneath the main text
+  rightBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    addChildForNode(node.id);
+  });
+
+  box.appendChild(rightBtn);
+}
+
+// Text content
+var textSpan = document.createElement("span");
+textSpan.textContent = node.text;
+textSpan.title = "Click to edit text";
+textSpan.addEventListener("click", function (e) {
+  e.stopPropagation();
+  editNode(node.id);
+});
+box.appendChild(textSpan);
+
+// Put the coloured box into the wrapper
+item.appendChild(box);
+
+// -------------- Measures BELOW the box (white space) --------------
 if (node.measures && node.measures.length) {
   var measuresWrap = document.createElement("div");
-  measuresWrap.className = "diagram-measures";
+  measuresWrap.className = "diagram-measures-outside";
   measuresWrap.style.marginTop = "6px";
   measuresWrap.style.fontSize = Math.max(10, (diagramAppearance.fontSize || 13) - 3) + "px";
   measuresWrap.style.lineHeight = "1.2";
-  measuresWrap.style.opacity = "0.95";
+  measuresWrap.style.color = "#111";
+  measuresWrap.style.background = "transparent";
 
   node.measures.forEach(function (m) {
     var row = document.createElement("div");
@@ -987,10 +998,11 @@ if (node.measures && node.measures.length) {
     measuresWrap.appendChild(row);
   });
 
-  box.appendChild(measuresWrap);
+  item.appendChild(measuresWrap);
 }
 
-      stack.appendChild(box);
+// Finally add the wrapper to the stack
+stack.appendChild(item);
     });
 
     columnsContainer.appendChild(col);
@@ -1008,7 +1020,7 @@ if (!window.requestAnimationFrame) {
       nodes.forEach(function (n) {
         if (!n.autoSize && !(n.measures && n.measures.length)) return;
 
-        var el = canvas.querySelector('.diagram-node[data-id="' + n.id + '"]');
+        var el = canvas.querySelector('.diagram-item[data-id="' + n.id + '"]');
         if (!el) return;
 
         // Real rendered height (includes wrapping)
