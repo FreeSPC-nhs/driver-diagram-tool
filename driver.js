@@ -1749,7 +1749,6 @@ function setAppearanceInputsFromConfig() {
 
 
 function updateAllViews() {
-  renderNodesTable();
   refreshParentOptions();
   renderDiagram();
   refreshColorSelect();
