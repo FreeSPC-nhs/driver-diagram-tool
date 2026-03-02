@@ -822,11 +822,9 @@ function renderLegend() {
 
   list.innerHTML = "";
 
-  if (!colorOptions.length) {
-    emptyMsg.style.display = "block";
-    return;
-  }
-
+ if (!colorOptions.length) {
+  emptyMsg.style.display = "block";
+} else {
   emptyMsg.style.display = "none";
 
   colorOptions.forEach(function (opt) {
@@ -844,6 +842,52 @@ function renderLegend() {
     li.appendChild(labelSpan);
     list.appendChild(li);
   });
+}
+
+  colorOptions.forEach(function (opt) {
+    var li = document.createElement("li");
+    li.className = "legend-item";
+
+    var swatch = document.createElement("span");
+    swatch.className = "legend-color-swatch";
+    swatch.style.backgroundColor = opt.value;
+
+    var labelSpan = document.createElement("span");
+    labelSpan.textContent = opt.label;
+
+    li.appendChild(swatch);
+    li.appendChild(labelSpan);
+    list.appendChild(li);
+  });
+
+// ---- Measure type key ----
+var keyTitle = document.createElement("div");
+keyTitle.textContent = "Measure key";
+keyTitle.style.marginTop = "10px";
+keyTitle.style.fontWeight = "600";
+keyTitle.style.fontSize = "12px";
+keyTitle.style.color = "#111";
+list.appendChild(keyTitle);
+
+measureTypes.forEach(function (mt) {
+  // Skip the "none" type if you don't want it in the key
+  if (mt.value === "none") return;
+
+  var li = document.createElement("li");
+  li.className = "legend-item";
+
+  var swatch = document.createElement("span");
+  swatch.className = "legend-color-swatch";
+  swatch.style.backgroundColor = mt.color;
+
+  var labelSpan = document.createElement("span");
+  labelSpan.textContent = mt.label;
+
+  li.appendChild(swatch);
+  li.appendChild(labelSpan);
+  list.appendChild(li);
+});
+
 }
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
@@ -2668,6 +2712,131 @@ function ensureNodeContextMenu() {
     menu.appendChild(hr);
   }
 
+function addSimpleSubmenu(label, buildItemsFn) {
+  // Row inside the main context menu
+  var row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.alignItems = "center";
+  row.style.justifyContent = "space-between";
+  row.style.padding = "8px 10px";
+  row.style.borderRadius = "6px";
+  row.style.cursor = "pointer";
+  row.style.color = "#111";
+
+  var left = document.createElement("span");
+  left.textContent = label;
+  var right = document.createElement("span");
+  right.textContent = "▸";
+  right.style.opacity = "0.7";
+
+  row.appendChild(left);
+  row.appendChild(right);
+
+  row.addEventListener("mouseenter", function () { row.style.background = "#f6f8fa"; });
+  row.addEventListener("mouseleave", function () { row.style.background = "transparent"; });
+
+  // Submenu container
+  var sub = document.createElement("div");
+  sub.className = "node-context-submenu";
+  sub.style.position = "fixed";
+  sub.style.display = "none";
+  sub.style.zIndex = "10000";
+  sub.style.minWidth = "240px";
+  sub.style.background = "#fff";
+  sub.style.border = "1px solid #d0d7de";
+  sub.style.borderRadius = "8px";
+  sub.style.boxShadow = "0 8px 24px rgba(0,0,0,0.14)";
+  sub.style.padding = "6px";
+  sub.style.fontSize = "13px";
+  sub.style.color = "#111";
+
+  // Ensure closeNodeContextMenu hides this too
+  // (If you already use nodeContextSubmenuEl for colour, we’ll hide ALL by class below)
+  sub.className = "node-context-submenu";
+
+  function addSubItem(text, onClick, disabled) {
+    if (disabled) {
+      var div = document.createElement("div");
+      div.textContent = text;
+      div.style.padding = "8px 10px";
+      div.style.color = "#6b7280";
+      div.style.userSelect = "none";
+      sub.appendChild(div);
+      return;
+    }
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = text;
+    btn.style.display = "block";
+    btn.style.width = "100%";
+    btn.style.textAlign = "left";
+    btn.style.padding = "8px 10px";
+    btn.style.border = "0";
+    btn.style.background = "transparent";
+    btn.style.cursor = "pointer";
+    btn.style.borderRadius = "6px";
+    btn.style.color = "#111";
+    btn.addEventListener("mouseenter", function () { btn.style.background = "#f6f8fa"; });
+    btn.addEventListener("mouseleave", function () { btn.style.background = "transparent"; });
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick();
+    });
+    sub.appendChild(btn);
+  }
+
+  function buildSubmenu() {
+    sub.innerHTML = "";
+    buildItemsFn(addSubItem);
+  }
+
+  function positionSubmenu() {
+    var r = row.getBoundingClientRect();
+    sub.style.display = "block";
+    var sr = sub.getBoundingClientRect();
+
+    var x = r.right + 6;
+    var y = r.top;
+
+    var maxX = window.innerWidth - sr.width - 8;
+    var maxY = window.innerHeight - sr.height - 8;
+
+    if (x > maxX) x = r.left - sr.width - 6;
+    if (y > maxY) y = maxY;
+
+    sub.style.left = x + "px";
+    sub.style.top = y + "px";
+  }
+
+  var hideTimer = null;
+  function show() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    buildSubmenu();
+    positionSubmenu();
+  }
+  function scheduleHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      sub.style.display = "none";
+    }, 180);
+  }
+
+  row.addEventListener("mouseenter", show);
+  row.addEventListener("mouseleave", scheduleHide);
+  sub.addEventListener("mouseenter", function () {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  });
+  sub.addEventListener("mouseleave", scheduleHide);
+
+  sub.addEventListener("click", function (e) { e.stopPropagation(); });
+
+  menu.appendChild(row);
+  document.body.appendChild(sub);
+}
+
+
   // Build menu items
   addItem("Edit text…", function (id) {
   if (!id) return;
@@ -2682,63 +2851,87 @@ addItem("Toggle auto-size to text", function (id) {
   updateAllViews();
 });
 
-addItem("Add measure…", function (id) {
-  if (!id) return;
-  addMeasureToNode(id);
-});
-
-addItem("Edit measure…", function (id) {
-  if (!id) return;
+// ---------- Measures submenu ----------
+addSimpleSubmenu("Measures", function (addSubItem) {
+  var id = contextNodeId;
   var n = nodes.find(function (x) { return x.id === id; });
-  if (!n || !n.measures || !n.measures.length) {
-    alert("No measures to edit on this item.");
-    return;
-  }
 
-  var list = n.measures.map(function (m, i) {
-    return (i + 1) + ") " + (m.text || "");
-  }).join("\n");
+  addSubItem("Add measure…", function () {
+    addMeasureToNode(id);
+    closeNodeContextMenu();
+  });
 
-  var pick = window.prompt("Enter the measure number to edit:\n\n" + list, "1");
-  if (pick === null) return;
+  var hasMeasures = !!(n && n.measures && n.measures.length);
 
-  var idx = parseInt(pick, 10) - 1;
-  if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
-    alert("That number is not valid.");
-    return;
-  }
+  addSubItem("Edit measure…", function () {
+    var list = n.measures.map(function (m, i) {
+      return (i + 1) + ") " + (m.text || "");
+    }).join("\n");
 
-  editMeasureOnNode(id, idx);
+    var pick = window.prompt("Enter the measure number to edit:\n\n" + list, "1");
+    if (pick === null) return;
+
+    var idx = parseInt(pick, 10) - 1;
+    if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
+      alert("That number is not valid.");
+      return;
+    }
+
+    editMeasureOnNode(id, idx);
+    closeNodeContextMenu();
+  }, !hasMeasures);
+
+  addSubItem("Delete measure…", function () {
+    var list = n.measures.map(function (m, i) {
+      return (i + 1) + ") " + (m.text || "");
+    }).join("\n");
+
+    var pick = window.prompt("Enter the measure number to delete:\n\n" + list, "1");
+    if (pick === null) return;
+
+    var idx = parseInt(pick, 10) - 1;
+    if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
+      alert("That number is not valid.");
+      return;
+    }
+
+    deleteMeasureOnNode(id, idx);
+    closeNodeContextMenu();
+  }, !hasMeasures);
+
+  addSubItem("Clear all measures…", function () {
+    clearMeasuresFromNode(id);
+    closeNodeContextMenu();
+  }, !hasMeasures);
 });
 
-addItem("Delete measure…", function (id) {
-  if (!id) return;
-  var n = nodes.find(function (x) { return x.id === id; });
-  if (!n || !n.measures || !n.measures.length) {
-    alert("No measures to delete on this item.");
-    return;
-  }
+addDivider();
 
-  var list = n.measures.map(function (m, i) {
-    return (i + 1) + ") " + (m.text || "");
-  }).join("\n");
+// ---------- Organise submenu ----------
+addSimpleSubmenu("Organise", function (addSubItem) {
+  var id = contextNodeId;
 
-  var pick = window.prompt("Enter the measure number to delete:\n\n" + list, "1");
-  if (pick === null) return;
+  addSubItem("Move up", function () {
+    moveNodeWithinSiblings(id, "up");
+    closeNodeContextMenu();
+  });
 
-  var idx = parseInt(pick, 10) - 1;
-  if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
-    alert("That number is not valid.");
-    return;
-  }
+  addSubItem("Move down", function () {
+    moveNodeWithinSiblings(id, "down");
+    closeNodeContextMenu();
+  });
 
-  deleteMeasureOnNode(id, idx);
+  addSubItem("Move to top", function () {
+    moveNodeWithinSiblings(id, "top");
+    closeNodeContextMenu();
+  });
+
+  addSubItem("Move to bottom", function () {
+    moveNodeWithinSiblings(id, "bottom");
+    closeNodeContextMenu();
+  });
 });
 
-addItem("Clear measures…", function (id) {
-  if (!id) return;
-  clearMeasuresFromNode(id);
-});
 
 function addDisabledItem(label) {
   var div = document.createElement("div");
@@ -2774,6 +2967,7 @@ function addColorSubmenu(label) {
 
   // Create submenu once
   var sub = document.createElement("div");
+  sub.className = "node-context-submenu";
   sub.style.position = "fixed";
   sub.style.display = "none";
   sub.style.zIndex = "10000";
@@ -2931,24 +3125,6 @@ function addColorSubmenu(label) {
 addColorSubmenu("Change colour");
   addDivider();
 
-  addItem("Move up", function (id) {
-  if (!id) return;
-  moveNodeWithinSiblings(id, "up");
-});
-addItem("Move down", function (id) {
-  if (!id) return;
-  moveNodeWithinSiblings(id, "down");
-});
-addItem("Move to top", function (id) {
-  if (!id) return;
-  moveNodeWithinSiblings(id, "top");
-});
-addItem("Move to bottom", function (id) {
-  if (!id) return;
-  moveNodeWithinSiblings(id, "bottom");
-});
-
-  addDivider();
 
   addItem("Delete…", function (id) {
   if (!id) return;
@@ -2993,6 +3169,10 @@ function openNodeContextMenu(nodeId, clientX, clientY) {
 }
 
 function closeNodeContextMenu() {
+  // hide any submenus we created
+  var subs = document.querySelectorAll(".node-context-submenu");
+  subs.forEach(function (el) { el.style.display = "none"; });
+
   if (nodeContextSubmenuEl) nodeContextSubmenuEl.style.display = "none";
   if (!nodeContextMenuEl) return;
   nodeContextMenuEl.style.display = "none";
