@@ -334,7 +334,17 @@
     /* Legend styles */
     #legend {
       margin-top: 0.5rem;
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      flex-wrap: wrap;
     }
+
+	/* Each legend block (e.g., Colour legend, Measures key) */
+	#legend .legend-block {
+	  min-width: 220px;             /* tweak if you want it tighter */
+ 	 flex: 1 1 260px;              /* grow/shrink nicely */
+	}
     .legend-title {
       font-size: 0.9rem;
       font-weight: 600;
@@ -350,8 +360,19 @@
       align-items: center;
       gap: 0.4rem;
       font-size: 0.8rem;
-      margin-bottom: 0.15rem;
+      margin-bottom: 0rem;
     }
+
+/* Put the list items into multiple columns where possible */
+#legendList,
+#measureKeyList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  column-gap: 14px;
+  row-gap: 4px;
+  margin-top: 4px;
+}
+
     .legend-color-swatch {
       width: 14px;
       height: 14px;
@@ -636,12 +657,19 @@
         <!-- Legend -->
 	<div id="legendContainer">
 	<div id="legend">
-          <p class="legend-title">Legend</p>
-          <p class="small" id="legendEmptyMessage">
-            No colours defined yet. Add colours on the left to see them listed here.
-          </p>
-          <ul id="legendList"></ul>
-        </div>
+   	 <div class="legend-block">
+  	  <p class="legend-title">Legend</p>
+  	  <p class="small" id="legendEmptyMessage">
+ 	     No colours defined yet. Add colours on the left to see them listed here.
+ 	   </p>
+  	  <ul id="legendList"></ul>
+ 	 </div>
+
+ 	 <div class="legend-block">
+ 	   <p class="legend-title">Measures key</p>
+	    <ul id="measureKeyList"></ul>
+	  </div>
+	 </div>
 	</div>
       </div>
 

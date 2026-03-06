@@ -786,30 +786,52 @@ function cycleNodeColor(node) {
 
 function renderLegend() {
   var list = document.getElementById("legendList");
+  var keyList = document.getElementById("measureKeyList");
   var emptyMsg = document.getElementById("legendEmptyMessage");
-  if (!list || !emptyMsg) return;
+  if (!list || !emptyMsg || !keyList) return;
 
   list.innerHTML = "";
+  keyList.innerHTML = "";
 
- if (!colorOptions.length) {
-  emptyMsg.style.display = "block";
-} else {
-  emptyMsg.style.display = "none";
-
+  // Palette legend
+  if (!colorOptions.length) {
+    emptyMsg.style.display = "block";
+  } else {
+    emptyMsg.style.display = "none";
     colorOptions.forEach(function (opt) {
+      var li = document.createElement("li");
+      li.className = "legend-item";
+
+      var swatch = document.createElement("span");
+      swatch.className = "legend-color-swatch";
+      swatch.style.backgroundColor = opt.value;
+
+      var labelSpan = document.createElement("span");
+      labelSpan.textContent = opt.label;
+
+      li.appendChild(swatch);
+      li.appendChild(labelSpan);
+      list.appendChild(li);
+    });
+  }
+
+  // Measures key (separate list)
+  measureTypes.forEach(function (mt) {
+    if (mt.value === "none") return;
+
     var li = document.createElement("li");
     li.className = "legend-item";
 
     var swatch = document.createElement("span");
     swatch.className = "legend-color-swatch";
-    swatch.style.backgroundColor = opt.value;
+    swatch.style.backgroundColor = mt.color;
 
     var labelSpan = document.createElement("span");
-    labelSpan.textContent = opt.label;
+    labelSpan.textContent = mt.label;
 
     li.appendChild(swatch);
     li.appendChild(labelSpan);
-    list.appendChild(li);
+    keyList.appendChild(li);
   });
 }
 
