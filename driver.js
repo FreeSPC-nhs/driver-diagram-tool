@@ -835,35 +835,6 @@ function renderLegend() {
   });
 }
 
-// ---- Measure type key ----
-var keyTitle = document.createElement("div");
-keyTitle.textContent = "Measures key";
-keyTitle.style.marginTop = "10px";
-keyTitle.style.fontWeight = "600";
-keyTitle.style.fontSize = "14px";
-keyTitle.style.color = "#111";
-list.appendChild(keyTitle);
-
-measureTypes.forEach(function (mt) {
-  // Skip the "none" type if you don't want it in the key
-  if (mt.value === "none") return;
-
-  var li = document.createElement("li");
-  li.className = "legend-item";
-
-  var swatch = document.createElement("span");
-  swatch.className = "legend-color-swatch";
-  swatch.style.backgroundColor = mt.color;
-
-  var labelSpan = document.createElement("span");
-  labelSpan.textContent = mt.label;
-
-  li.appendChild(swatch);
-  li.appendChild(labelSpan);
-  list.appendChild(li);
-});
-
-}
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
 
