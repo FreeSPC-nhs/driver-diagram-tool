@@ -2774,7 +2774,7 @@ function toggleControlsVisibility() {
 
   controlsVisible = !controlsVisible;
   panel.style.display = controlsVisible ? "" : "none";
-  btn.textContent = controlsVisible ? "Hide controls" : "Show controls";
+  btn.textContent = controlsVisible ? "Hide editing panel" : "Show editing panel";
 
   // When controls are hidden, make the diagram take full width;
   // when shown, revert to the original 2-column layout.
@@ -2966,10 +2966,10 @@ function updateLegendVisibility() {
 
     if (legendVisible) {
         legend.style.display = "block";
-        btn.textContent = "Hide legend";
+        btn.textContent = "Hide key";
     } else {
         legend.style.display = "none";
-        btn.textContent = "Show legend";
+        btn.textContent = "Show key";
     }
 }
 
