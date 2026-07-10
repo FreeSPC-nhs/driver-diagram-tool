@@ -2054,6 +2054,472 @@ function deleteNode(id) {
 
 }
 
+/* ---------- Portable HTML project ---------- */
+
+/*
+  Creates a clean data object containing everything needed to
+  reconstruct the diagram.
+*/
+function getPortableProjectData() {
+  return {
+    format: "driver-diagram-portable",
+    version: 1,
+    savedAt: new Date().toISOString(),
+
+    nodes: nodes.map(function (n) {
+      return {
+        id: (n.id || "").toString(),
+        level: n.level || "",
+        text: n.text || "",
+        parentId: n.parentId || "",
+        color: n.color || "",
+        autoSize: !!n.autoSize,
+        measures: Array.isArray(n.measures)
+          ? n.measures.map(function (m) {
+              return {
+                type: (m && m.type) ? m.type : "none",
+                text: (m && m.text) ? m.text : ""
+              };
+            })
+          : []
+      };
+    }),
+
+    connections: connections.map(function (c) {
+      return {
+        fromId: (c.fromId || "").toString(),
+        toId: (c.toId || "").toString()
+      };
+    }),
+
+    colorOptions: colorOptions.map(function (c) {
+      return {
+        label: c.label || "",
+        value: c.value || ""
+      };
+    }),
+
+    columnTitles: {
+      aim: columnTitles.aim || "Aim",
+      primary: columnTitles.primary || "Primary drivers",
+      secondary: columnTitles.secondary || "Secondary drivers",
+      change: columnTitles.change || "Change ideas"
+    },
+
+    diagramAppearance: {
+      boxHeight: diagramAppearance.boxHeight,
+      verticalGap: diagramAppearance.verticalGap,
+      fontSize: diagramAppearance.fontSize,
+      fontFamily: diagramAppearance.fontFamily || "",
+      fontBold: !!diagramAppearance.fontBold
+    },
+
+    legendVisible: legendVisible !== false
+  };
+}
+
+
+/*
+  Makes JSON safe to place inside an HTML <script> element.
+
+  This is important because users may type characters such as
+  <, > or & into a node or measure.
+*/
+function makeJsonSafeForHtml(value) {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+
+/*
+  Checks whether the currently opened HTML file contains an
+  embedded portable project.
+
+  Returns true if a project was successfully loaded.
+*/
+function loadEmbeddedProjectIfPresent() {
+  var dataElement = document.getElementById("embeddedProjectData");
+
+  if (!dataElement) {
+    return false;
+  }
+
+  try {
+    var raw = dataElement.textContent || "";
+    var project = JSON.parse(raw);
+
+    if (
+      !project ||
+      project.format !== "driver-diagram-portable" ||
+      !Array.isArray(project.nodes)
+    ) {
+      throw new Error("This is not a recognised portable driver diagram.");
+    }
+
+    nodes = project.nodes.map(function (n) {
+      return {
+        id: (n.id || "").toString(),
+        level: n.level || "",
+        text: n.text || "",
+        parentId: n.parentId || "",
+        color: n.color || "",
+        autoSize: !!n.autoSize,
+        measures: Array.isArray(n.measures)
+          ? n.measures.map(function (m) {
+              return {
+                type: (m && m.type) ? m.type : "none",
+                text: (m && m.text) ? m.text : ""
+              };
+            })
+          : []
+      };
+    });
+
+    connections = Array.isArray(project.connections)
+      ? project.connections
+          .map(function (c) {
+            return {
+              fromId: (c.fromId || "").toString(),
+              toId: (c.toId || "").toString()
+            };
+          })
+          .filter(function (c) {
+            return c.fromId && c.toId;
+          })
+      : [];
+
+    colorOptions = Array.isArray(project.colorOptions)
+      ? project.colorOptions
+          .map(function (c) {
+            return {
+              label: (c.label || "").toString(),
+              value: (c.value || "").toString()
+            };
+          })
+          .filter(function (c) {
+            return c.label && c.value;
+          })
+      : [];
+
+    if (project.columnTitles) {
+      if (project.columnTitles.aim) {
+        columnTitles.aim = project.columnTitles.aim;
+      }
+
+      if (project.columnTitles.primary) {
+        columnTitles.primary = project.columnTitles.primary;
+      }
+
+      if (project.columnTitles.secondary) {
+        columnTitles.secondary = project.columnTitles.secondary;
+      }
+
+      if (project.columnTitles.change) {
+        columnTitles.change = project.columnTitles.change;
+      }
+    }
+
+    if (project.diagramAppearance) {
+      var savedAppearance = project.diagramAppearance;
+
+      if (
+        isFinite(savedAppearance.boxHeight) &&
+        savedAppearance.boxHeight > 0
+      ) {
+        diagramAppearance.boxHeight = savedAppearance.boxHeight;
+      }
+
+      if (
+        isFinite(savedAppearance.verticalGap) &&
+        savedAppearance.verticalGap >= 0
+      ) {
+        diagramAppearance.verticalGap = savedAppearance.verticalGap;
+      }
+
+      if (
+        isFinite(savedAppearance.fontSize) &&
+        savedAppearance.fontSize > 0
+      ) {
+        diagramAppearance.fontSize = savedAppearance.fontSize;
+      }
+
+      diagramAppearance.fontFamily =
+        savedAppearance.fontFamily || "";
+
+      diagramAppearance.fontBold =
+        !!savedAppearance.fontBold;
+    }
+
+    legendVisible = project.legendVisible !== false;
+
+    /*
+      Clear old measurements so the newly opened project is
+      measured from its actual rendered content.
+    */
+    measuredBoxHeightsById = {};
+    measuredItemHeightsById = {};
+    suppressAutosizeRelayout = false;
+
+    updateNextIdFromNodes();
+
+    /*
+      Older portable files may not contain the connections array.
+      In that case, reconstruct it from parentId.
+    */
+    if (!connections.length) {
+      rebuildConnectionsFromParents();
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Portable project load error:", error);
+
+    alert(
+      "The portable driver diagram could not be loaded.\n\n" +
+      "The file may be damaged or may have been created by an incompatible version."
+    );
+
+    return false;
+  }
+}
+
+
+/*
+  Gets the application JavaScript.
+
+  In a normal copy of the tool, it reads driver.js.
+  In an already-portable copy, it reuses the embedded JavaScript.
+*/
+function getDriverSourceForPortableExport() {
+  var embeddedSource =
+    document.getElementById("portableDriverSource");
+
+  if (
+    embeddedSource &&
+    (embeddedSource.textContent || "").trim()
+  ) {
+    return Promise.resolve(embeddedSource.textContent);
+  }
+
+  var driverScript = null;
+  var scripts = document.querySelectorAll("script[src]");
+
+  scripts.forEach(function (script) {
+    var source = script.getAttribute("src") || "";
+
+    if (/(^|\/)driver\.js(\?|#|$)/i.test(source)) {
+      driverScript = script;
+    }
+  });
+
+  var driverUrl;
+
+  if (driverScript && driverScript.src) {
+    driverUrl = driverScript.src;
+  } else {
+    driverUrl = new URL("driver.js", window.location.href).href;
+  }
+
+  return fetch(driverUrl, {
+    cache: "no-store"
+  }).then(function (response) {
+    if (!response.ok) {
+      throw new Error(
+        "Could not read driver.js. HTTP status: " +
+        response.status
+      );
+    }
+
+    return response.text();
+  });
+}
+
+
+/*
+  Creates a suitable filename from the Aim text.
+*/
+function getPortableFilename() {
+  var aimNode = nodes.find(function (n) {
+    return n.level === "aim";
+  });
+
+  var filename =
+    aimNode && aimNode.text
+      ? aimNode.text
+      : "driver-diagram";
+
+  filename = filename
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 70);
+
+  if (!filename) {
+    filename = "driver-diagram";
+  }
+
+  return filename + ".html";
+}
+
+
+/*
+  Creates and downloads the portable HTML file.
+*/
+function downloadPortableHtml() {
+  if (!nodes.length) {
+    alert("There is no driver diagram to save.");
+    return;
+  }
+
+  var projectData = getPortableProjectData();
+  var projectJson = makeJsonSafeForHtml(projectData);
+
+  getDriverSourceForPortableExport()
+    .then(function (driverSource) {
+      /*
+        Clone the current page.
+
+        Event listeners are not included in the clone, so they
+        will be recreated normally when the saved file opens.
+      */
+      var htmlClone =
+        document.documentElement.cloneNode(true);
+
+      /*
+        Remove temporary menus created while using the tool.
+      */
+      htmlClone
+        .querySelectorAll(
+          "#nodeContextMenu, .node-context-submenu"
+        )
+        .forEach(function (element) {
+          element.remove();
+        });
+
+      /*
+        Ensure the Help window is closed in the saved copy.
+      */
+      var helpOverlay =
+        htmlClone.querySelector("#helpOverlay");
+
+      if (helpOverlay) {
+        helpOverlay.classList.remove("is-open");
+        helpOverlay.setAttribute("aria-hidden", "true");
+      }
+
+      /*
+        Remove the normal external driver.js reference and any
+        older embedded project/application scripts.
+      */
+      htmlClone
+        .querySelectorAll("script")
+        .forEach(function (script) {
+          var source =
+            script.getAttribute("src") || "";
+
+          var isDriverScript =
+            /(^|\/)driver\.js(\?|#|$)/i.test(source);
+
+          var isOldPortableData =
+            script.id === "embeddedProjectData";
+
+          var isOldPortableSource =
+            script.id === "portableDriverSource";
+
+          if (
+            isDriverScript ||
+            isOldPortableData ||
+            isOldPortableSource
+          ) {
+            script.remove();
+          }
+        });
+
+      var cloneBody =
+        htmlClone.querySelector("body");
+
+      if (!cloneBody) {
+        throw new Error(
+          "Could not find the document body."
+        );
+      }
+
+      /*
+        Add the project data before the application code.
+      */
+      var dataScript =
+        document.createElement("script");
+
+      dataScript.id = "embeddedProjectData";
+      dataScript.type = "application/json";
+      dataScript.textContent = projectJson;
+
+      cloneBody.appendChild(dataScript);
+
+      /*
+        Inline driver.js so the portable copy does not need the
+        separate driver.js file.
+      */
+      var applicationScript =
+        document.createElement("script");
+
+      applicationScript.id = "portableDriverSource";
+
+      /*
+        Prevent any literal closing-script sequence inside the
+        JavaScript from prematurely ending this script element.
+      */
+      applicationScript.textContent =
+        driverSource.replace(
+          /<\/script/gi,
+          "<\\/script"
+        );
+
+      cloneBody.appendChild(applicationScript);
+
+      var completeHtml =
+        "<!DOCTYPE html>\n" +
+        htmlClone.outerHTML;
+
+      var blob = new Blob(
+        [completeHtml],
+        {
+          type: "text/html;charset=utf-8"
+        }
+      );
+
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+
+      link.href = url;
+      link.download = getPortableFilename();
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+    })
+    .catch(function (error) {
+      console.error(
+        "Portable HTML export error:",
+        error
+      );
+
+      alert(
+        "The portable HTML file could not be created.\n\n" +
+        "The tool could not read driver.js. This can happen when the original tool is opened directly from a folder rather than through a web address or local web server.\n\n" +
+        "Technical detail: " +
+        error.message
+      );
+    });
+}
+
+
 /* ---------- CSV import / export ---------- */
 
 function downloadCsv() {
@@ -3053,6 +3519,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var clearBtn = document.getElementById("clearAllBtn");
   var downloadBtn = document.getElementById("downloadCsvBtn");
   var uploadInput = document.getElementById("uploadCsvInput");
+  var btnSavePortable = document.getElementById("btnSavePortable");
   var addColorBtn = document.getElementById("addColorBtn");
 
   var btnToggleControls = document.getElementById("btnToggleControls");
@@ -3074,6 +3541,9 @@ if (exportArea) {
   if (addBtn) addBtn.addEventListener("click", addNodeFromForm);
   if (clearBtn) clearBtn.addEventListener("click", clearAllNodes);
   if (downloadBtn) downloadBtn.addEventListener("click", downloadCsv);
+  if (btnSavePortable) {
+    btnSavePortable.addEventListener("click", downloadPortableHtml);
+  }
   if (uploadInput) {
     uploadInput.addEventListener("change", function (e) {
       var file = e.target.files && e.target.files[0];
@@ -3145,12 +3615,29 @@ if (exportArea) {
   // Set up collapsible sections in controls panel
   setupCollapsibleSections();
 
-// Ensure an Aim box exists on first load
-ensureDefaultAim(); 
+/*
+  A portable HTML file contains embedded project data.
+  A normal copy of the application does not.
+*/
+var loadedEmbeddedProject =
+  loadEmbeddedProjectIfPresent();
 
-// Initial render (using default appearance)
+if (loadedEmbeddedProject) {
+  /*
+    Use the appearance settings stored in the portable file.
+    Do not read the default HTML input values, because that
+    would overwrite the saved settings.
+  */
+  setAppearanceInputsFromConfig();
+  updateAllViews();
+} else {
+  /*
+    Normal application startup.
+  */
+  ensureDefaultAim();
   applyDiagramAppearanceFromInputs();
   setAppearanceInputsFromConfig();
+}
 
 ensureNodeContextMenu();
 
