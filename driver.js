@@ -496,6 +496,220 @@ var colorOptions = [];
 // Track which colour is being edited using a stable key (the hex value), not an array index
 var editingColorValue = null;
 
+// Default shown when adding a new colour
+var defaultNewColorValue = "#fff7cc";
+
+function findColorOptionByValue(value) {
+  if (!value) return null;
+
+  return colorOptions.find(function (option) {
+    return (
+      (option.value || "").toLowerCase() ===
+      value.toLowerCase()
+    );
+  }) || null;
+}
+
+function getColorEditorElements() {
+  return {
+    title: document.getElementById("colorEditorTitle"),
+    labelInput: document.getElementById("colorLabelInput"),
+    valueInput: document.getElementById("colorValueInput"),
+    saveButton: document.getElementById("addColorBtn"),
+    cancelButton: document.getElementById("cancelColorEditBtn"),
+    status: document.getElementById("colorEditStatus")
+  };
+}
+
+function setColorEditorStatus(message, type) {
+  var status = document.getElementById("colorEditStatus");
+  if (!status) return;
+
+  status.textContent = message || "";
+
+  status.classList.remove(
+    "is-warning",
+    "is-success"
+  );
+
+  if (type === "warning") {
+    status.classList.add("is-warning");
+  }
+
+  if (type === "success") {
+    status.classList.add("is-success");
+  }
+}
+
+function isColorEditorDirty() {
+  if (!editingColorValue) return false;
+
+  var elements = getColorEditorElements();
+  var option = findColorOptionByValue(editingColorValue);
+
+  if (
+    !option ||
+    !elements.labelInput ||
+    !elements.valueInput
+  ) {
+    return false;
+  }
+
+  var currentLabel =
+    (elements.labelInput.value || "").trim();
+
+  var currentValue =
+    (elements.valueInput.value || "").toLowerCase();
+
+  return (
+    currentLabel !== option.label ||
+    currentValue !==
+      (option.value || "").toLowerCase()
+  );
+}
+
+function updateColorEditorUi() {
+  var elements = getColorEditorElements();
+  var option = findColorOptionByValue(editingColorValue);
+
+  /*
+    If the colour no longer exists, return safely to
+    add mode.
+  */
+  if (editingColorValue && !option) {
+    editingColorValue = null;
+  }
+
+  var isEditing = !!editingColorValue;
+
+  if (elements.title) {
+    elements.title.textContent = isEditing
+      ? "Edit colour: " + option.label
+      : "Add a new colour";
+  }
+
+  if (elements.saveButton) {
+    elements.saveButton.textContent = isEditing
+      ? "Save changes"
+      : "Add colour";
+
+    /*
+      While editing, Save changes remains disabled until
+      something has actually changed.
+    */
+    elements.saveButton.disabled =
+      isEditing && !isColorEditorDirty();
+  }
+
+  if (elements.cancelButton) {
+    elements.cancelButton.hidden = !isEditing;
+  }
+}
+
+function handleColorEditorInput() {
+  updateColorEditorUi();
+
+  if (!editingColorValue) {
+    setColorEditorStatus("");
+    return;
+  }
+
+  var option = findColorOptionByValue(editingColorValue);
+
+  if (isColorEditorDirty()) {
+    setColorEditorStatus(
+      "Unsaved changes",
+      "warning"
+    );
+  } else if (option) {
+    setColorEditorStatus(
+      'Editing "' + option.label +
+      '". Change the name or colour, then select Save changes.'
+    );
+  }
+}
+
+function resetColorEditorForm() {
+  var elements = getColorEditorElements();
+
+  editingColorValue = null;
+
+  if (elements.labelInput) {
+    elements.labelInput.value = "";
+  }
+
+  if (elements.valueInput) {
+    elements.valueInput.value =
+      defaultNewColorValue;
+  }
+
+  setColorEditorStatus("");
+  updateColorEditorUi();
+}
+
+function beginColorEdit(value) {
+  var option = findColorOptionByValue(value);
+  if (!option) return;
+
+  /*
+    Protect unsaved work if the user selects Edit on a
+    different colour.
+  */
+  if (
+    editingColorValue &&
+    editingColorValue.toLowerCase() !==
+      value.toLowerCase() &&
+    isColorEditorDirty()
+  ) {
+    var discard = window.confirm(
+      "You have unsaved colour changes. " +
+      "Discard them and edit another colour?"
+    );
+
+    if (!discard) return;
+  }
+
+  var elements = getColorEditorElements();
+
+  editingColorValue = option.value;
+
+  if (elements.labelInput) {
+    elements.labelInput.value = option.label;
+  }
+
+  if (elements.valueInput) {
+    elements.valueInput.value = option.value;
+  }
+
+  updateColorEditorUi();
+
+  setColorEditorStatus(
+    'Editing "' + option.label +
+    '". Change the name or colour, then select Save changes.'
+  );
+
+  renderColorOptionsList();
+
+  if (elements.labelInput) {
+    elements.labelInput.focus();
+    elements.labelInput.select();
+  }
+}
+
+function cancelColorEdit() {
+  resetColorEditorForm();
+  renderColorOptionsList();
+
+  setColorEditorStatus(
+    "Editing cancelled."
+  );
+}
+
+function initialiseColorEditor() {
+  resetColorEditorForm();
+  renderColorOptionsList();
+}
+
 function refreshColorSelect() {
   var select = document.getElementById("nodeColor");
   if (!select) return;
@@ -529,179 +743,332 @@ function refreshColorSelect() {
 function deleteColorOptionByValue(value) {
   if (!value) return;
 
-  var opt = colorOptions.find(function (c) {
-    return (c.value || "").toLowerCase() === value.toLowerCase();
+  var option = findColorOptionByValue(value);
+  if (!option) return;
+
+  var usageCount = nodes.filter(function (node) {
+    return (
+      (node.color || "").toLowerCase() ===
+      value.toLowerCase()
+    );
+  }).length;
+
+  var message =
+    'Delete the colour "' + option.label + '"?';
+
+  if (usageCount > 0) {
+    message +=
+      "\n\nIt is currently used on " +
+      usageCount +
+      (usageCount === 1 ? " box." : " boxes.") +
+      " Those boxes will return to having no colour.";
+  }
+
+  if (!window.confirm(message)) return;
+
+  colorOptions = colorOptions.filter(function (item) {
+    return (
+      (item.value || "").toLowerCase() !==
+      value.toLowerCase()
+    );
   });
-  if (!opt) return;
 
-  if (!window.confirm('Delete colour "' + opt.label + '"?')) return;
-
-  // Remove from palette
-  colorOptions = colorOptions.filter(function (c) {
-    return (c.value || "").toLowerCase() !== value.toLowerCase();
-  });
-
-  // Remove from any nodes using it
-  nodes.forEach(function (n) {
-    if ((n.color || "").toLowerCase() === value.toLowerCase()) {
-      n.color = "";
+  nodes.forEach(function (node) {
+    if (
+      (node.color || "").toLowerCase() ===
+      value.toLowerCase()
+    ) {
+      node.color = "";
     }
   });
 
-  // Stop editing if we deleted the one being edited
-  if (editingColorValue && editingColorValue.toLowerCase() === value.toLowerCase()) {
-    editingColorValue = null;
-    var labelInput = document.getElementById("colorLabelInput");
-    if (labelInput) labelInput.value = "";
+  var deletedCurrentColour =
+    editingColorValue &&
+    editingColorValue.toLowerCase() ===
+      value.toLowerCase();
+
+  if (deletedCurrentColour) {
+    resetColorEditorForm();
   }
 
   updateAllViews();
+
+  setColorEditorStatus(
+    'Colour "' + option.label + '" deleted.',
+    "success"
+  );
 }
 
 function renderColorOptionsList() {
-  var list = document.getElementById("colorOptionsList");
+  updateColorEditorUi();
+
+  var list =
+    document.getElementById("colorOptionsList");
+
   if (!list) return;
 
   list.innerHTML = "";
 
   if (colorOptions.length === 0) {
-    var li = document.createElement("li");
-    li.textContent = "No custom colours defined yet.";
-    list.appendChild(li);
+    var emptyItem = document.createElement("li");
+
+    emptyItem.className =
+      "colour-options-empty";
+
+    emptyItem.textContent =
+      "No colours have been added yet.";
+
+    list.appendChild(emptyItem);
     return;
   }
 
-  colorOptions.forEach(function (opt, index) {
-    var li = document.createElement("li");
-    li.style.cursor = "pointer";
-    li.title = "Click to edit this colour";
-    li.style.display = "flex";
-    li.style.alignItems = "center";
-    li.style.gap = "0.5rem";
-    li.style.padding = "3px 0"; 
+  colorOptions.forEach(function (option) {
+    var listItem =
+      document.createElement("li");
 
-    var textSpan = document.createElement("span");
-    textSpan.textContent = (index + 1) + ". " + opt.label + " (" + opt.value + ")";
-    li.appendChild(textSpan);
+    listItem.className =
+      "colour-option-row";
 
-    // underline the one we're editing
-    if (
+    var isEditingThisColour =
       editingColorValue &&
-      (opt.value || "").toLowerCase() === editingColorValue.toLowerCase()
-    ) {
-      li.style.fontWeight = "600";
-      li.style.textDecoration = "underline";
+      (option.value || "").toLowerCase() ===
+        editingColorValue.toLowerCase();
+
+    if (isEditingThisColour) {
+      listItem.classList.add("is-editing");
     }
 
-    // delete button (×)
-    var delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.textContent = "×"; // better centring than "X"
-    delBtn.title = "Delete this colour";
-    delBtn.style.margin = "2px 0 2px auto";   // top right bottom left
+    var swatch =
+      document.createElement("span");
 
+    swatch.className =
+      "colour-option-swatch";
 
-    delBtn.style.width = "18px";
-    delBtn.style.height = "18px";
-   
-    delBtn.style.display = "inline-flex";
-    delBtn.style.alignItems = "center";
-    delBtn.style.justifyContent = "center";
+    swatch.style.backgroundColor =
+      option.value;
 
-    delBtn.style.padding = "0";
-    delBtn.style.fontSize = "12px";
-    delBtn.style.lineHeight = "1";
-    delBtn.style.cursor = "pointer";
-    delBtn.style.borderRadius = "4px";
-    delBtn.style.fontWeight = "bold";
+    swatch.title = option.value;
 
+    var details =
+      document.createElement("div");
 
+    details.className =
+      "colour-option-details";
 
-    delBtn.addEventListener("click", function (e) {
-      e.stopPropagation(); // don't trigger edit
-      deleteColorOptionByValue(opt.value);
-    });
+    var name =
+      document.createElement("span");
 
-    li.appendChild(delBtn);
+    name.className =
+      "colour-option-name";
 
-    li.addEventListener("click", function () {
-      var labelInput = document.getElementById("colorLabelInput");
-      var valueInput = document.getElementById("colorValueInput");
-      if (!labelInput || !valueInput) return;
+    name.textContent = option.label;
 
-      editingColorValue = opt.value;
-      labelInput.value = opt.label;
-      valueInput.value = opt.value;
+    var valueText =
+      document.createElement("span");
 
-      renderColorOptionsList();
-    });
+    valueText.className =
+      "colour-option-value";
 
-    list.appendChild(li);
+    valueText.textContent = option.value;
+
+    details.appendChild(name);
+    details.appendChild(valueText);
+
+    var actions =
+      document.createElement("div");
+
+    actions.className =
+      "colour-option-actions";
+
+    var editButton =
+      document.createElement("button");
+
+    editButton.type = "button";
+    editButton.className =
+      "colour-row-button";
+
+    editButton.textContent =
+      isEditingThisColour
+        ? "Editing"
+        : "Edit";
+
+    editButton.disabled =
+      !!isEditingThisColour;
+
+    editButton.setAttribute(
+      "aria-label",
+      "Edit " + option.label
+    );
+
+    editButton.addEventListener(
+      "click",
+      function () {
+        beginColorEdit(option.value);
+      }
+    );
+
+    var deleteButton =
+      document.createElement("button");
+
+    deleteButton.type = "button";
+    deleteButton.className =
+      "colour-row-button delete";
+
+    deleteButton.textContent = "Delete";
+
+    deleteButton.setAttribute(
+      "aria-label",
+      "Delete " + option.label
+    );
+
+    deleteButton.addEventListener(
+      "click",
+      function () {
+        deleteColorOptionByValue(
+          option.value
+        );
+      }
+    );
+
+    actions.appendChild(editButton);
+    actions.appendChild(deleteButton);
+
+    listItem.appendChild(swatch);
+    listItem.appendChild(details);
+    listItem.appendChild(actions);
+
+    list.appendChild(listItem);
   });
 }
 
 function addColorOptionFromForm() {
-  var labelInput = document.getElementById("colorLabelInput");
-  var valueInput = document.getElementById("colorValueInput");
+  var labelInput =
+    document.getElementById("colorLabelInput");
+
+  var valueInput =
+    document.getElementById("colorValueInput");
+
   if (!labelInput || !valueInput) return;
 
-  var label = (labelInput.value || "").trim();
-  var value = (valueInput.value || "").trim();
+  var label =
+    (labelInput.value || "").trim();
 
-  if (!value) {
-    alert("Please choose a colour value.");
+  var value =
+    (valueInput.value || "")
+      .trim()
+      .toLowerCase();
+
+  if (!label) {
+    alert("Please enter a name for this colour.");
+    labelInput.focus();
+    return;
+  }
+
+  if (!/^#[0-9a-f]{6}$/i.test(value)) {
+    alert("Please choose a valid colour.");
+    valueInput.focus();
     return;
   }
 
   var isEditing = !!editingColorValue;
 
-  // Only auto-name when adding new (not when editing)
-  if (!label) {
-    if (isEditing) {
-      var existingLabel = colorOptions.find(function (c) {
-        return (c.value || "").toLowerCase() === editingColorValue.toLowerCase();
-      });
-      label = existingLabel ? existingLabel.label : "";
-    } else {
-      label = "Colour " + (colorOptions.length + 1);
-    }
-  }
-
   if (isEditing) {
     var oldValue = editingColorValue;
-
-    var target = colorOptions.find(function (c) {
-      return (c.value || "").toLowerCase() === oldValue.toLowerCase();
-    });
+    var target =
+      findColorOptionByValue(oldValue);
 
     if (!target) {
-      // fallback: if not found, add new
-      colorOptions.push({ label: label, value: value });
-    } else {
-      target.label = label;
-      target.value = value;
+      alert(
+        "The colour being edited could not be found. " +
+        "Please select it again."
+      );
 
-      // update nodes that used old colour value
-      nodes.forEach(function (n) {
-        if (n.color === oldValue) n.color = value;
-      });
+      resetColorEditorForm();
+      renderColorOptionsList();
+      return;
     }
 
-    editingColorValue = null; // stop editing
-  } else {
-    // add new, or update by colour value if it already exists
-    var existing = colorOptions.find(function (c) {
-      return (c.value || "").toLowerCase() === value.toLowerCase();
+    /*
+      Prevent two palette entries from having the same
+      hex value. Nodes store the hex value, so duplicates
+      would be ambiguous.
+    */
+    var duplicate = colorOptions.find(
+      function (option) {
+        return (
+          (option.value || "").toLowerCase() ===
+            value &&
+          (option.value || "").toLowerCase() !==
+            oldValue.toLowerCase()
+        );
+      }
+    );
+
+    if (duplicate) {
+      alert(
+        'That colour is already used by "' +
+        duplicate.label +
+        '". Please choose a different colour.'
+      );
+
+      valueInput.focus();
+      return;
+    }
+
+    target.label = label;
+    target.value = value;
+
+    /*
+      Update every box that used the old colour.
+    */
+    nodes.forEach(function (node) {
+      if (
+        (node.color || "").toLowerCase() ===
+        oldValue.toLowerCase()
+      ) {
+        node.color = value;
+      }
     });
-    if (existing) {
-      existing.label = label;
-    } else {
-      colorOptions.push({ label: label, value: value });
-    }
+
+    resetColorEditorForm();
+    updateAllViews();
+
+    setColorEditorStatus(
+      'Colour "' + label + '" updated.',
+      "success"
+    );
+
+    return;
   }
 
-  labelInput.value = "";
+  /*
+    Adding a new colour.
+  */
+  var existing =
+    findColorOptionByValue(value);
+
+  if (existing) {
+    alert(
+      'That colour is already in your list as "' +
+      existing.label +
+      '". Use its Edit button to change it.'
+    );
+
+    return;
+  }
+
+  colorOptions.push({
+    label: label,
+    value: value
+  });
+
+  resetColorEditorForm();
   updateAllViews();
+
+  setColorEditorStatus(
+    'Colour "' + label + '" added.',
+    "success"
+  );
 }
 
 // When importing CSV, we may see colour values that aren't in colorOptions yet.
@@ -725,7 +1092,7 @@ function rebuildColorOptionsFromNodes() {
     index++;
   }
 
-  editingColorValue = null;
+  resetColorEditorForm();
   refreshColorSelect();
   renderColorOptionsList();
 }
@@ -3520,7 +3887,10 @@ document.addEventListener("DOMContentLoaded", function () {
   var downloadBtn = document.getElementById("downloadCsvBtn");
   var uploadInput = document.getElementById("uploadCsvInput");
   var btnSavePortable = document.getElementById("btnSavePortable");
-  var addColorBtn = document.getElementById("addColorBtn");
+  var addColorBtn =  document.getElementById("addColorBtn");
+  var cancelColorEditBtn =  document.getElementById("cancelColorEditBtn");
+  var colorLabelInput =  document.getElementById("colorLabelInput");
+  var colorValueInput =  document.getElementById("colorValueInput");
 
   var btnToggleControls = document.getElementById("btnToggleControls");
   var btnHeaderClear = document.getElementById("btnHeaderClear");
@@ -3553,11 +3923,43 @@ if (exportArea) {
       }
     });
   }
-  if (addColorBtn) {
-    addColorBtn.addEventListener("click", function () {
-      addColorOptionFromForm();
-    });
-  }
+  
+if (addColorBtn) {
+  addColorBtn.addEventListener(
+    "click",
+    addColorOptionFromForm
+  );
+}
+
+if (cancelColorEditBtn) {
+  cancelColorEditBtn.addEventListener(
+    "click",
+    cancelColorEdit
+  );
+}
+
+if (colorLabelInput) {
+  colorLabelInput.addEventListener(
+    "input",
+    handleColorEditorInput
+  );
+}
+
+if (colorValueInput) {
+  colorValueInput.addEventListener(
+    "input",
+    handleColorEditorInput
+  );
+
+  /*
+    Some browsers report colour-picker changes using
+    the change event rather than input.
+  */
+  colorValueInput.addEventListener(
+    "change",
+    handleColorEditorInput
+  );
+}
 
   if (btnToggleControls) {
     btnToggleControls.addEventListener("click", toggleControlsVisibility);
@@ -3639,6 +4041,7 @@ if (loadedEmbeddedProject) {
   setAppearanceInputsFromConfig();
 }
 
+initialiseColorEditor();
 ensureNodeContextMenu();
 
 });

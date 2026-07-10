@@ -132,6 +132,121 @@
       white-space: nowrap;
     }
 
+/* Improved colour editor */
+.colour-editor-title,
+.colour-list-title {
+  margin: 0.8rem 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.colour-form-actions {
+  align-items: center;
+}
+
+.colour-edit-status {
+  min-height: 1.2rem;
+  margin: 0.4rem 0 0;
+}
+
+.colour-edit-status.is-warning {
+  color: #8a5300;
+  font-weight: 600;
+}
+
+.colour-edit-status.is-success {
+  color: #007f3b;
+  font-weight: 600;
+}
+
+.color-options-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.colour-options-empty {
+  padding: 0.5rem;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.colour-option-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+
+  margin-bottom: 0.35rem;
+  padding: 0.45rem 0.5rem;
+
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.colour-option-row.is-editing {
+  border-color: #005eb8;
+  background: #eef5fc;
+  box-shadow: inset 3px 0 0 #005eb8;
+}
+
+.colour-option-swatch {
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid #888;
+  border-radius: 3px;
+}
+
+.colour-option-details {
+  min-width: 0;
+}
+
+.colour-option-name {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #222;
+}
+
+.colour-option-value {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  color: #666;
+}
+
+.colour-option-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+button.colour-row-button {
+  padding: 0.25rem 0.45rem;
+  border-radius: 4px;
+  background: #e8edf5;
+  color: #005eb8;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+button.colour-row-button:hover {
+  background: #dbe5f2;
+}
+
+button.colour-row-button.delete {
+  background: #fff1f0;
+  color: #a61911;
+}
+
+button.colour-row-button.delete:hover {
+  background: #fbd9d6;
+}
+
+
 /* Save/open file controls */
 .file-actions {
   display: grid;
@@ -656,29 +771,65 @@ label.file-action-button {
   </div>
 
   <!-- Colour options -->
-  <h2 class="collapsible-header" data-target="sectionColourOptions">
-    <span>2. Colours and key</span>
-    <span class="collapsible-indicator">▾</span>
-  </h2>
-  <div id="sectionColourOptions" class="collapsible-section is-collapsed">
-    <p class="small">
-      Define optional colours you can apply to boxes. For example, you might use
-      different colours for related primary drivers or to highlight priority areas.
-      Click an existing colour in the list to edit it.
-    </p>
+<h2 class="collapsible-header" data-target="sectionColourOptions">
+  <span>2. Colours and key</span>
+  <span class="collapsible-indicator">▾</span>
+</h2>
 
-    <label for="colorLabelInput">Label for colour</label>
-    <input id="colorLabelInput" type="text" placeholder="e.g. Primary 1">
+<div id="sectionColourOptions" class="collapsible-section is-collapsed">
+  <p class="small">
+    Use colours to identify themes, teams, workstreams or priority areas.
+    Add a new colour below, or select <strong>Edit</strong> next to an
+    existing colour.
+  </p>
 
-    <label for="colorValueInput">Colour value</label>
-    <input id="colorValueInput" type="color" value="#fff7cc">
+  <h3 id="colorEditorTitle" class="colour-editor-title">
+    Add a new colour
+  </h3>
 
-    <div class="buttons">
-      <button id="addColorBtn" class="secondary">Add / update colour option</button>
-    </div>
+  <label for="colorLabelInput">Colour name</label>
+  <input
+    id="colorLabelInput"
+    type="text"
+    placeholder="e.g. Workforce workstream">
 
-    <ul id="colorOptionsList" class="small" style="margin-top:0.5rem;padding-left:1rem;"></ul>
+  <label for="colorValueInput">Choose colour</label>
+  <input
+    id="colorValueInput"
+    type="color"
+    value="#fff7cc">
+
+  <div class="buttons colour-form-actions">
+    <button
+      id="addColorBtn"
+      type="button"
+      class="secondary">
+      Add colour
+    </button>
+
+    <button
+      id="cancelColorEditBtn"
+      type="button"
+      class="secondary"
+      hidden>
+      Cancel
+    </button>
   </div>
+
+  <p
+    id="colorEditStatus"
+    class="small colour-edit-status"
+    aria-live="polite">
+  </p>
+
+  <h3 class="colour-list-title">Your colours</h3>
+
+  <ul
+    id="colorOptionsList"
+    class="color-options-list">
+  </ul>
+</div>
+
 
 <!-- Diagram appearance -->
   <h2 class="collapsible-header" data-target="sectionAppearance">
