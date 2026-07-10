@@ -132,6 +132,83 @@
       white-space: nowrap;
     }
 
+/* Save/open file controls */
+.file-actions {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.file-action-button {
+  appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.4rem;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  margin: 0;
+  padding: 0.45rem 0.8rem;
+
+  border: 1px solid transparent;
+  border-radius: 6px;
+
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Main recommended action */
+.file-action-button.primary {
+  background: #005eb8;
+  color: #ffffff;
+}
+
+.file-action-button.primary:hover {
+  background: #003d78;
+}
+
+/* Supporting actions */
+.file-action-button.secondary {
+  background: #e8edf5;
+  color: #005eb8;
+  border-color: #ccd8e6;
+}
+
+.file-action-button.secondary:hover {
+  background: #dbe5f2;
+}
+
+/* Override the general label styling */
+label.file-action-button {
+  display: inline-flex;
+  margin: 0;
+}
+
+/* Keyboard accessibility */
+.file-action-button:focus-visible {
+  outline: 3px solid rgba(0, 94, 184, 0.35);
+  outline-offset: 2px;
+}
+
+.file-help {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #555;
+}
+
+
 /* Button-like styling that can be used on <button>, <a>, <label>, etc. */
 .btn {
   display: inline-flex;
@@ -514,17 +591,17 @@
     <div>
       <h1>Driver Diagram Tool</h1>
       <p class="info">
-        Web-based driver diagram tool. Add an aim, primary/secondary drivers and change ideas,
-        download as CSV, and export the visual diagram for reports. Colours and legend can be configured.
+        Create and edit a driver diagram with an aim, drivers, change ideas and
+  measures. Save your work or download it as an image or PDF.
       </p>
     </div>
     <div class="header-buttons">
-	<button id="btnHelp">Help / info</button>      
-	<button id="btnToggleControls">Hide controls</button>
-      <button id="toggleLegendBtn">Hide legend</button>
-      <button id="btnHeaderClear">Clear all</button>
-      <button id="btnExportPng">Export chart (PNG)</button>
-      <button id="btnExportPdf">Export PDF</button>
+	<button id="btnHelp">Help</button>      
+	<button id="btnToggleControls">Hide editing panel</button>
+      <button id="toggleLegendBtn">Hide key</button>
+      <button id="btnHeaderClear">Start new diagram</button>
+      <button id="btnExportPng">Download image</button>
+      <button id="btnExportPdf">Download PDF</button>
     </div>
   </header>
 
@@ -534,34 +611,53 @@
  
   <!-- Import / export -->
   <h2 class="collapsible-header" data-target="sectionImportExport">
-    <span>1. Import / export</span>
+    <span>1. Save or open a diagram</span>
     <span class="collapsible-indicator">▾</span>
   </h2>
-  <div id="sectionImportExport" class="collapsible-section">
-    <p class="small">
-      Use CSV to save your driver diagram and reload it later. The CSV includes the
-      colour associated with each box.
-    </p>
+  <p>
+  Save an editable copy of your diagram, or reopen a file that you saved earlier.
+</p>
 
-    <div class="buttons">
-  <button id="downloadCsvBtn" class="secondary">Save as CSV</button>
+<div class="file-actions">
+  <button
+    id="btnSavePortable"
+    type="button"
+    class="file-action-button primary">
+    Save diagram
+  </button>
 
-  <label class="secondary nowrap">
-    <span>Upload CSV</span>
-    <input id="uploadCsvInput" type="file" accept=".csv" style="display:none;">
+  <label
+    for="uploadCsvInput"
+    class="file-action-button secondary">
+    Open saved file
+
+    <input
+      id="uploadCsvInput"
+      type="file"
+      accept=".csv"
+      hidden>
   </label>
 
-  <button id="btnSavePortable" class="secondary">
-    Save portable HTML
+  <button
+    id="downloadCsvBtn"
+    type="button"
+    class="file-action-button secondary">
+    Download CSV backup
   </button>
 </div>
+
+<p class="file-help">
+  <strong>Save diagram</strong> creates an HTML file that you can open directly
+  from a folder. CSV files are useful as backups and can be reopened using
+  <strong>Open saved file</strong>.
+</p>
 
     <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;" />
   </div>
 
   <!-- Colour options -->
   <h2 class="collapsible-header" data-target="sectionColourOptions">
-    <span>2. Colour options</span>
+    <span>2. Colours and key</span>
     <span class="collapsible-indicator">▾</span>
   </h2>
   <div id="sectionColourOptions" class="collapsible-section is-collapsed">
@@ -647,7 +743,7 @@
 
     <!-- Right column: diagram + legend + table -->
     <section class="card" id="diagramArea">
-      <h2>4. Diagram & items</h2>
+      <h2>4. Your driver diagram</h2>
 
       <!-- Export area: diagram + legend (used for PNG/PDF export) -->
       <div id="exportArea">
