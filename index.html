@@ -4,702 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Driver Diagram Tool</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 0;
-      padding: 1.5rem;
-      background: #f5f5f5;
-    }
+  
+<link rel="stylesheet" href="./styles.css">
 
-    /* App header */
-    header.app-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      background: #005eb8; /* NHS blue */
-      color: #ffffff;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-      gap: 1rem;
-    }
-    .app-header h1 {
-      margin: 0 0 0.25rem;
-      font-size: 1.4rem;
-    }
-    .app-header .info {
-      margin: 0;
-      font-size: 0.85rem;
-      color: #e0ecff;
-      max-width: 700px;
-    }
-    .header-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      justify-content: flex-end;
-    }
-    .header-buttons button {
-      border-radius: 999px;
-      border: 1px solid #ffffff;
-      background: rgba(255,255,255,0.12);
-      color: #ffffff;
-      padding: 0.3rem 0.7rem;
-      font-size: 0.8rem;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .header-buttons button:hover {
-      background: rgba(255,255,255,0.2);
-    }
-
-    main {
-      display: grid;
-      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-      gap: 1.5rem;
-      align-items: flex-start;
-    }
-
-    .card {
-      background: #ffffff;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-      padding: 1rem 1.25rem;
-    }
-    .card h2 {
-      margin-top: 0;
-      font-size: 1.1rem;
-    }
-    label {
-      display: block;
-      margin-bottom: 0.25rem;
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-    input[type="text"],
-    select,
-    textarea,
-    input[type="color"] {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 0.4rem 0.5rem;
-      margin-bottom: 0.6rem;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      font: inherit;
-    }
-    textarea {
-      resize: vertical;
-      min-height: 60px;
-    }
-    input[type="color"] {
-      padding: 0;
-      height: 2rem;
-    }
-    .buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-    button {
-      border: none;
-      border-radius: 4px;
-      padding: 0.4rem 0.8rem;
-      font: inherit;
-      cursor: pointer;
-      background: #005eb8;
-      color: #ffffff;
-    }
-    button.secondary {
-      background: #e8edf5;
-      color: #005eb8;
-    }
-    button.danger {
-      background: #d5281b;
-      color: #ffffff;
-    }
-    button:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-    .small {
-      font-size: 0.8rem;
-      color: #666;
-    }
-    .nowrap {
-      white-space: nowrap;
-    }
-
-/* Improved colour editor */
-.colour-editor-title,
-.colour-list-title {
-  margin: 0.8rem 0 0.5rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.colour-form-actions {
-  align-items: center;
-}
-
-.colour-edit-status {
-  min-height: 1.2rem;
-  margin: 0.4rem 0 0;
-}
-
-.colour-edit-status.is-warning {
-  color: #8a5300;
-  font-weight: 600;
-}
-
-.colour-edit-status.is-success {
-  color: #007f3b;
-  font-weight: 600;
-}
-
-.color-options-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.colour-options-empty {
-  padding: 0.5rem;
-  color: #666;
-  font-size: 0.8rem;
-}
-
-.colour-option-row {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  align-items: center;
-
-  margin-bottom: 0.35rem;
-  padding: 0.45rem 0.5rem;
-
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  background: #ffffff;
-}
-
-.colour-option-row.is-editing {
-  border-color: #005eb8;
-  background: #eef5fc;
-  box-shadow: inset 3px 0 0 #005eb8;
-}
-
-.colour-option-swatch {
-  width: 16px;
-  height: 16px;
-  box-sizing: border-box;
-  border: 1px solid #888;
-  border-radius: 3px;
-}
-
-.colour-option-details {
-  min-width: 0;
-}
-
-.colour-option-name {
-  display: block;
-  overflow-wrap: anywhere;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #222;
-}
-
-.colour-option-value {
-  display: block;
-  margin-top: 0.1rem;
-  font-size: 0.72rem;
-  color: #666;
-}
-
-.colour-option-actions {
-  display: flex;
-  gap: 0.25rem;
-  align-items: center;
-}
-
-button.colour-row-button {
-  padding: 0.25rem 0.45rem;
-  border-radius: 4px;
-  background: #e8edf5;
-  color: #005eb8;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-button.colour-row-button:hover {
-  background: #dbe5f2;
-}
-
-button.colour-row-button.delete {
-  background: #fff1f0;
-  color: #a61911;
-}
-
-button.colour-row-button.delete:hover {
-  background: #fbd9d6;
-}
-
-
-/* Save/open file controls */
-.file-actions {
-  display: grid;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.file-action-button {
-  appearance: none;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 2.4rem;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  margin: 0;
-  padding: 0.45rem 0.8rem;
-
-  border: 1px solid transparent;
-  border-radius: 6px;
-
-  font-family: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  line-height: 1.2;
-
-  text-align: center;
-  text-decoration: none;
-  white-space: nowrap;
-
-  cursor: pointer;
-  user-select: none;
-}
-
-/* Main recommended action */
-.file-action-button.primary {
-  background: #005eb8;
-  color: #ffffff;
-}
-
-.file-action-button.primary:hover {
-  background: #003d78;
-}
-
-/* Supporting actions */
-.file-action-button.secondary {
-  background: #e8edf5;
-  color: #005eb8;
-  border-color: #ccd8e6;
-}
-
-.file-action-button.secondary:hover {
-  background: #dbe5f2;
-}
-
-/* Override the general label styling */
-label.file-action-button {
-  display: inline-flex;
-  margin: 0;
-}
-
-/* Keyboard accessibility */
-.file-action-button:focus-visible {
-  outline: 3px solid rgba(0, 94, 184, 0.35);
-  outline-offset: 2px;
-}
-
-.file-help {
-  margin: 0.6rem 0 0;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  color: #555;
-}
-
-
-/* Button-like styling that can be used on <button>, <a>, <label>, etc. */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-
-  font: inherit;
-  font-size: 0.9rem;
-  line-height: 1;
-
-  cursor: pointer;
-  user-select: none;
-  text-decoration: none;
-
-  border: 1px solid transparent;
-  transition: background 120ms ease, transform 60ms ease, box-shadow 120ms ease;
-}
-
-.btn:active {
-  transform: translateY(1px);
-}
-
-/* Secondary style (matches your Upload CSV look, but slightly refined) */
-.btn.secondary {
-  background: #e8edf5;
-  color: #005eb8;
-  border-color: rgba(0, 94, 184, 0.15);
-}
-
-.btn.secondary:hover {
-  background: #dde6f2;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-}
-
-/* Optional: keyboard focus */
-.btn:focus-visible {
-  outline: 3px solid rgba(0, 94, 184, 0.35);
-  outline-offset: 2px;
-}
-
-    /* Diagram styles */
-    #diagramCanvasWrapper {
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 0.4rem;
-      margin-bottom: 0.75rem;
-      background: #fafafa;
-      min-height: 350px;
-    }
-    #diagramCanvas {
-      position: relative;
-      width: 100%;
-      min-height: 350px;
-    }
-    #diagramConnections {
-      position: absolute;
-      top: 0;
-      left: 0;
-      pointer-events: none;
-    }
-    #diagramColumns {
-      position: relative;
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 3.5rem;
-    }
-    
-    /* Columns now have a separate stack for their nodes */
-    .diagram-column {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .diagram-column-stack {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content:  space-between;
-    }
-
-    /* For the Aim column, centre its single node vertically */
-    .diagram-column.aim-column .diagram-column-stack {
-      justify-content: center;
-    }
-
-
-    .diagram-column-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      margin-bottom: 0.25rem;
-      color: #666;
-    }
-    .diagram-node {
-      position: relative;
-      background: #ffffff;
-      border-radius: 4px;
-      border: 1px solid #d0d7de;
-      padding: 0.25rem 1.2rem; /* extra space for +/- buttons */
-      font-size: 0.8rem;
-      line-height: 1.3;
-      box-shadow: 0 1px 1px rgba(0,0,0,0.04);
-      cursor: pointer;
-      display: flex;         
-      align-items: center;
-    }
-    .diagram-node.level-aim {
-      border-left: 4px solid #005eb8;
-    }
-    .diagram-node.level-primary {
-      border-left: 4px solid #007f3b;
-    }
-    .diagram-node.level-secondary {
-      border-left: 4px solid #ff8c00;
-    }
-    .diagram-node.level-change {
-      border-left: 4px solid #a31e5c;
-    }
-        .diagram-add {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 12px;
-      height: 18px;
-      border-radius: 50%;
-      border: 1px solid #c0c0c0;
-      background: #ffffff;
-      font-size: 11px;
-      font-weight: 600;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: #555;
-    }
-.diagram-delete {
-  position: absolute;
-  top: 4px;
-  left: 6px;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  font-size: 14px;
-  border-radius: 4px;
-  cursor: pointer;
-
-  opacity: 0;
-  pointer-events: none;
-}
-
-.diagram-node:hover .diagram-delete,
-.diagram-node:focus-within .diagram-delete {
-  opacity: 1;
-  pointer-events: auto;
-}
-    .diagram-add-left {
-      left: -10px;
-    }
-    .diagram-add-right {
-      right: -10px;
-    }
-     .diagram-color-badge {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      right: 15px;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 1px solid #666;
-      background: #ffffff;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
-      cursor: pointer;
-    }
-
-	/* Hide colour badges and add/connect buttons in exported images */
-	.export-clean .diagram-color-badge,
-	.export-clean .diagram-add {
-	  display: none !important;
-	}
-
-
-    /* Hide colour badges when exporting */
-    .hide-badges .diagram-color-badge {
-      display: none;
-    }
-
-
-    /* Legend styles */
-    #legend {
-      margin-top: 0.5rem;
-      display: flex;
-      gap: 18px;
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-
-	/* Each legend block (e.g., Colour legend, Measures key) */
-	#legend .legend-block {
-	  min-width: 220px;             /* tweak if you want it tighter */
- 	 flex: 1 1 260px;              /* grow/shrink nicely */
-	}
-    .legend-title {
-      font-size: 0.9rem;
-      font-weight: 600;
-      margin: 0 0 0.25rem;
-    }
-    #legendList {
-      list-style: none;
-      padding-left: 0;
-      margin: 0;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.8rem;
-      margin-bottom: 0rem;
-    }
-
-/* Put the list items into multiple columns where possible */
-#legendList,
-#measureKeyList {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  column-gap: 14px;
-  row-gap: 4px;
-  margin-top: 4px;
-}
-
-    .legend-color-swatch {
-      width: 14px;
-      height: 14px;
-      border-radius: 3px;
-      border: 1px solid #666;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-    th, td {
-      padding: 0.35rem 0.4rem;
-      border-bottom: 1px solid #eee;
-      vertical-align: top;
-    }
-    th {
-      text-align: left;
-      font-weight: 600;
-      background: #f5f5f5;
-    }
-
-    @media (max-width: 900px) {
-      header.app-header {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .header-buttons {
-        justify-content: flex-start;
-      }
-    }
-
-    .collapsible-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      margin-bottom: 0.25rem;
-    }
-    .collapsible-header span:first-child {
-      flex: 1;
-    }
-    .collapsible-indicator {
-      font-size: 0.8rem;
-      color: #555;
-      margin-left: 0.5rem;
-    }
-    .collapsible-section {
-      margin-bottom: 0.75rem;
-    }
-    .collapsible-section.is-collapsed {
-      display: none;
-    }
-
-    /* Help / info modal */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.35);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-    .modal-overlay.is-open {
-      display: flex;
-    }
-    .modal-dialog {
-      background: #ffffff;
-      max-width: 820px;
-      width: 90%;
-      max-height: 80vh;
-      border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-      padding: 1.25rem 1.5rem;
-      overflow-y: auto;
-      position: relative;
-      font-size: 0.9rem;
-    }
-    .modal-dialog h2 {
-      margin-top: 0;
-      font-size: 1.1rem;
-    }
-    .modal-dialog h3 {
-      margin-bottom: 0.25rem;
-      margin-top: 1rem;
-      font-size: 1rem;
-    }
-    .modal-dialog p {
-      margin-top: 0.25rem;
-      margin-bottom: 0.5rem;
-    }
-    .modal-dialog ul {
-      margin-top: 0.25rem;
-      margin-bottom: 0.5rem;
-      padding-left: 1.25rem;
-    }
-    .modal-close-btn {
-      position: absolute;
-      top: 0.4rem;
-      right: 0.6rem;
-      border: none;
-      background: transparent;
-      color: #555;
-      font-size: 1.1rem;
-      cursor: pointer;
-    }
-    .modal-close-btn:hover {
-      color: #000;
-    }
-    .faq-question {
-      font-weight: 600;
-      margin-top: 0.5rem;
-    }
-
-
-    @media (max-width: 800px) {
-      main {
-        grid-template-columns: 1fr;
-      }
-      #diagramColumns {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-
-  </style>
 
   <!-- PapaParse for CSV import/export -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.2/papaparse.min.js"></script>
-  <!-- html2canvas + html2pdf for PNG/PDF export -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="./papaparse.min.js"></script>
+  <!-- Export code is part of driver.js; no screenshot or PDF library required. -->
 </head>
 <body>
   <header class="app-header">
@@ -707,31 +18,98 @@ label.file-action-button {
       <h1>Driver Diagram Tool</h1>
       <p class="info">
         Create and edit a driver diagram with an aim, drivers, change ideas and
-  measures. Save your work or download it as an image or PDF.
+  measures. Save your work or export a PNG, SVG or vector PDF.
       </p>
     </div>
     <div class="header-buttons">
-	<button id="btnHelp">Help</button>      
-	<button id="btnToggleControls">Hide editing panel</button>
-      <button id="toggleLegendBtn">Hide key</button>
-      <button id="btnHeaderClear">Start new diagram</button>
-      <button id="btnExportPng">Download image</button>
-      <button id="btnExportPdf">Download PDF</button>
+
+<!-- B3.1: Undo and Redo -->
+<button id="btnDiagramUndo"
+        type="button"
+        title="Undo (Ctrl+Z or Cmd+Z)"
+        aria-keyshortcuts="Control+Z Meta+Z"
+        disabled>
+  ↶ Undo
+</button>
+
+<button id="btnDiagramRedo"
+        type="button"
+        title="Redo (Ctrl+Y or Ctrl/Cmd+Shift+Z)"
+        aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z"
+        disabled>
+  ↷ Redo
+</button>
+
+
+
+
+
+
+      <button id="btnHeaderClear" type="button">Start new diagram</button>
+
+      <details id="exportChartMenu" class="export-chart-menu">
+        <summary aria-label="Export chart as PDF, PNG or SVG">
+          Export chart <span aria-hidden="true">▾</span>
+        </summary>
+        <div class="export-chart-choices" role="group" aria-label="Choose export format">
+          <button type="button" id="btnExportVectorPdf"
+                  title="Vector PDF for sharing or printing; selectable text and A3, A2, A1 page options">
+            <strong>PDF</strong>
+            <small>Print-ready, selectable text</small>
+          </button>
+          <button type="button" id="btnExportVectorPng"
+                  title="High-resolution PNG image for PowerPoint, reports or email">
+            <strong>PNG</strong>
+            <small>High-resolution image</small>
+          </button>
+          <button type="button" id="btnExportVectorSvg"
+                  title="Scalable SVG vector graphic for design and publishing">
+            <strong>SVG</strong>
+            <small>Scalable vector graphic</small>
+          </button>
+        </div>
+      </details>
+
+      <button id="btnHelp" type="button">Help</button>
+      <button id="btnAiGuidance"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="aiGuidanceDialog">AI guidance</button>
     </div>
   </header>
 
   <main>
-    <!-- Left column: data entry + CSV + colours -->
-    <section class="card" id="controlsPanel">
+    <!-- Left column: editing controls, with an always-visible toggle. -->
+    <div id="sidebarDock">
+      <div class="sidebar-toggle-row">
+        <button id="btnToggleControls" type="button" class="toolbar-icon-button"
+              aria-controls="controlsPanel" aria-expanded="true"
+              aria-label="Hide editing panel" title="Hide editing panel">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2.5" y="4" width="19" height="16" rx="2"/>
+          <path d="M9 4v16"/>
+          <path class="panel-close-indicator" d="M15.5 9l-3 3 3 3"/>
+          <path class="panel-open-indicator" d="M12.5 9l3 3-3 3"/>
+        </svg>
+        </button>
+      </div>
+      <section class="card" id="controlsPanel">
  
   <!-- Import / export -->
-  <h2 class="collapsible-header" data-target="sectionImportExport">
+  <h2 class="collapsible-heading">
+  <button type="button" class="collapsible-header"
+          data-target="sectionImportExport" aria-controls="sectionImportExport"
+          aria-expanded="true">
     <span>1. Save or open a diagram</span>
-    <span class="collapsible-indicator">▾</span>
-  </h2>
-  <p>
-  Save an editable copy of your diagram, or reopen a file that you saved earlier.
-</p>
+    <span class="collapsible-indicator" aria-hidden="true">▾</span>
+  </button>
+</h2>
+  <div id="sectionImportExport" class="collapsible-section">
+    <p>
+      Save an editable copy of your diagram, or reopen a file that you saved earlier.
+    </p>
 
 <div class="file-actions">
   <button
@@ -764,56 +142,38 @@ label.file-action-button {
 <p class="file-help">
   <strong>Save diagram</strong> creates an HTML file that you can open directly
   from a folder. CSV files are useful as backups and can be reopened using
-  <strong>Open saved file</strong>.
+  <strong>Open saved file</strong>. CSV backups use reversible spreadsheet-safety
+  escaping so that imported diagram text is preserved.
 </p>
 
     <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;" />
   </div>
 
+
   <!-- Colour options -->
-<h2 class="collapsible-header" data-target="sectionColourOptions">
-  <span>2. Colours and key</span>
-  <span class="collapsible-indicator">▾</span>
+
+<h2 class="collapsible-heading">
+  <button type="button" class="collapsible-header"
+          data-target="sectionColourOptions" aria-controls="sectionColourOptions"
+          aria-expanded="false">
+    <span>2. Colours and key</span>
+    <span class="collapsible-indicator" aria-hidden="true">▸</span>
+  </button>
 </h2>
 
 <div id="sectionColourOptions" class="collapsible-section is-collapsed">
-  <p class="small">
-    Use colours to identify themes, teams, workstreams or priority areas.
-    Add a new colour below, or select <strong>Edit</strong> next to an
-    existing colour.
-  </p>
-
-  <h3 id="colorEditorTitle" class="colour-editor-title">
-    Add a new colour
-  </h3>
-
-  <label for="colorLabelInput">Colour name</label>
-  <input
-    id="colorLabelInput"
-    type="text"
-    placeholder="e.g. Workforce workstream">
-
-  <label for="colorValueInput">Choose colour</label>
-  <input
-    id="colorValueInput"
-    type="color"
-    value="#fff7cc">
-
-  <div class="buttons colour-form-actions">
-    <button
-      id="addColorBtn"
-      type="button"
-      class="secondary">
-      Add colour
+  <div class="colour-add-row">
+    <button type="button" id="btnSidebarColourPalette" class="secondary">
+      Add a colour…
     </button>
-
-    <button
-      id="cancelColorEditBtn"
-      type="button"
-      class="secondary"
-      hidden>
-      Cancel
-    </button>
+    <span class="colour-help-wrap">
+      <button type="button" id="colourHelpButton" class="colour-help-button"
+              aria-label="Help with colours and key" aria-describedby="colourHelpTip">?</button>
+      <span id="colourHelpTip" class="colour-help-tooltip" role="tooltip">
+        Name colours to identify themes or workstreams. Saved colours appear in the key.
+        Use Edit beside a colour to change it.
+      </span>
+    </span>
   </div>
 
   <p
@@ -832,10 +192,14 @@ label.file-action-button {
 
 
 <!-- Diagram appearance -->
-  <h2 class="collapsible-header" data-target="sectionAppearance">
+  <h2 class="collapsible-heading">
+  <button type="button" class="collapsible-header"
+          data-target="sectionAppearance" aria-controls="sectionAppearance"
+          aria-expanded="false">
     <span>3. Diagram appearance</span>
-    <span class="collapsible-indicator">▾</span>
-  </h2>
+    <span class="collapsible-indicator" aria-hidden="true">▸</span>
+  </button>
+</h2>
   <div id="sectionAppearance" class="collapsible-section is-collapsed">
     <p class="small">
       Adjust the size, spacing and text styling of the boxes in the diagram. These
@@ -885,18 +249,175 @@ label.file-action-button {
       <span>Bold text</span>
     </label>
 
+
+<!-- B2.5: Connection line appearance -->
+<label for="connectionStyleInput">
+  Connecting lines
+</label>
+
+<select id="connectionStyleInput">
+  <option value="bezier">
+    Curved (Bézier)
+  </option>
+  <option value="straight">
+    Straight
+  </option>
+  <option value="orthogonal">
+    Orthogonal (right-angle)
+  </option>
+</select>
+
+<p class="small">
+  Changes are previewed immediately.
+</p>
+
+
     <div class="buttons">
       <button id="applyAppearanceBtn" class="secondary">Apply appearance</button>
     </div>
   </div>
 </section>
-
+    </div> <!-- #sidebarDock: keeps the toggle available when panel is hidden -->
 
     <!-- Right column: diagram + legend + table -->
     <section class="card" id="diagramArea">
       <h2>4. Your driver diagram</h2>
 
-      <!-- Export area: diagram + legend (used for PNG/PDF export) -->
+      <!-- B4.4a.1: Diagram / Outline switch -->
+      <div id="diagramViewSwitch"
+           role="group"
+           aria-label="View diagram as">
+
+        <button type="button"
+                id="btnViewDiagram"
+                aria-pressed="true">
+          Diagram
+        </button>
+
+        <button type="button"
+                id="btnViewOutline"
+                aria-pressed="false">
+          Outline
+        </button>
+
+      </div>
+
+
+<!-- B1.2: Controls for the selected diagram element -->
+<div id="diagramSelectionBar" role="group"
+     aria-label="Selected diagram element" hidden>
+  <strong id="diagramSelectedDescription"></strong>
+
+  <button type="button" id="diagramEditTextBtn">
+    Edit text
+  </button>
+
+  <button type="button" id="diagramSaveTextBtn" hidden>
+    Save
+  </button>
+
+  <button type="button" id="diagramCancelTextBtn"
+          class="secondary" hidden>
+    Cancel
+  </button>
+
+  <span id="diagramEditFeedback"
+        aria-live="polite"></span>
+</div>
+
+
+
+<!-- B3.3a: Floating visual connection-style menu -->
+<div id="connectionFormatBar" role="group"
+     aria-label="Connection style" hidden>
+
+  <div class="connection-popup-heading">
+    <strong>Connection style</strong>
+
+    <button type="button"
+            id="connectionFormatClear"
+            aria-label="Deselect connection"
+            title="Close">×</button>
+  </div>
+
+  <p id="connectionFormatLabel"></p>
+
+  <!-- Retained for the existing JavaScript change handler -->
+  <select id="connectionFormatSelect" hidden>
+    <option value="default">Use diagram default</option>
+    <option value="straight">Straight</option>
+    <option value="orthogonal">Orthogonal</option>
+    <option value="bezier">Bézier</option>
+  </select>
+
+  <div class="connection-style-options">
+
+    <button type="button" class="connection-style-choice"
+            data-connection-style="default">
+      <span class="connection-style-default-icon"
+            aria-hidden="true">↺</span>
+      <span class="connection-style-name">
+        Use diagram default
+        <small>Follow the overall line style</small>
+      </span>
+      <span class="connection-style-check" aria-hidden="true">✓</span>
+    </button>
+
+    <button type="button" class="connection-style-choice"
+            data-connection-style="straight">
+      <svg viewBox="0 0 42 24" aria-hidden="true"
+           focusable="false">
+        <path d="M4 19 L38 5"/>
+      </svg>
+      <span class="connection-style-name">Straight</span>
+      <span class="connection-style-check" aria-hidden="true">✓</span>
+    </button>
+
+    <button type="button" class="connection-style-choice"
+            data-connection-style="orthogonal">
+      <svg viewBox="0 0 42 24" aria-hidden="true"
+           focusable="false">
+        <path d="M4 19 H21 V5 H38"/>
+      </svg>
+      <span class="connection-style-name">Orthogonal</span>
+      <span class="connection-style-check" aria-hidden="true">✓</span>
+    </button>
+
+    <button type="button" class="connection-style-choice"
+            data-connection-style="bezier">
+      <svg viewBox="0 0 42 24" aria-hidden="true"
+           focusable="false">
+        <path d="M4 19 C18 19 24 5 38 5"/>
+      </svg>
+      <span class="connection-style-name">Bézier</span>
+      <span class="connection-style-check" aria-hidden="true">✓</span>
+    </button>
+
+  </div>
+</div>
+
+
+
+      <!-- B4.4a.1: Read-only Outline view -->
+<div id="diagramOutlineView"
+     hidden
+     aria-label="Diagram outline">
+
+  <p>
+    Browse your diagram as an expandable list.
+    To make changes, switch back to Diagram view.
+  </p>
+
+  <p id="diagramOutlineStatus"
+   role="status"
+   aria-live="polite"></p>
+
+<ul id="diagramOutlineTree"></ul>
+
+</div>
+
+<!-- Export area: diagram + legend (used for PNG/PDF export) -->
+      <div id="diagramExportShell">
       <div id="exportArea">
         <div id="diagramCanvasWrapper">
           <div id="diagramCanvas">
@@ -923,11 +444,259 @@ label.file-action-button {
 	 </div>
 	</div>
       </div>
+      <button id="toggleLegendBtn" type="button" class="key-visibility-icon"
+              aria-controls="legendContainer" aria-pressed="true"
+              aria-label="Hide key" title="Hide key">
+        <svg viewBox="0 0 24 24" width="19" height="19"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/>
+          <circle cx="12" cy="12" r="2.8"/>
+          <path class="key-hidden-slash" d="M3 21 21 3"/>
+        </svg>
+      </button>
+      </div> <!-- #diagramExportShell: key icon stays outside exported chart -->
 
     </section>
   </main>
 
+
+<!-- B5.3a.1 — AI guidance modal -->
+<dialog id="aiGuidanceDialog"
+        aria-labelledby="aiGuidanceTitle">
+
+  <div class="ai-guidance-header">
+    <h2 id="aiGuidanceTitle">
+      AI-assisted diagram development
+    </h2>
+
+    <button type="button"
+            id="btnCloseAiGuidance"
+            aria-label="Close AI guidance">
+      &times;
+    </button>
+  </div>
+
+  <div id="aiGuidanceContent">
+  <!-- B5.3a: Optional AI guidance. This panel does not contact an AI service. -->
+  <details id="aiAssistancePanel" class="ai-assistance">
+    <summary>AI-assisted diagram development <span>(optional)</span></summary>
+    <div class="ai-assistance-content">
+      <p>
+        AI can help you explore or organise ideas for a driver diagram.
+        It is optional: the diagram should always reflect your improvement
+        group's own understanding and decisions.
+      </p>
+
+       <!-- Open by default, but users can collapse this warning. -->
+      <details class="ai-ig-warning" open>
+        <summary>Important: protect confidential information</summary>
+        <div class="ai-ig-warning-content">
+        <p>
+          <strong>Do not paste or upload patient-identifiable,
+          staff-identifiable, other personal or confidential information</strong>
+          into an AI chatbot unless your organisation has specifically
+          authorised that AI service and that use of the information.
+        </p>
+        <p>
+          Meeting notes, workshop findings, incident reports and slides can
+          identify people indirectly, even when names have been removed.
+          Check documents carefully before sharing them.
+        </p>
+        <p>
+          Access to an organisation-provided AI product, including Microsoft
+          365 Copilot, does not automatically authorise every type of data or
+          every use case. Follow your local IG and AI policies. If unsure,
+          ask your IG lead, Data Protection Officer or Caldicott Guardian.
+        </p>
+        </div>
+      </details>
+
+      <p class="ai-privacy-note">
+        <strong>What this tool does:</strong> This panel provides guidance only.
+        It does not connect to an AI service, accept project documents or send
+        diagram information to a chatbot.
+      </p>
+
+      <h3>Three ways AI could help</h3>
+      <div class="ai-scenarios">
+        <details class="ai-scenario">
+          <summary>Create an initial draft</summary>
+          <p>
+            Create a deliberately provisional draft from project documents or
+            background context. Expect the improvement group to make
+            substantial changes. Avoid suggested measures unless requested.
+          </p>
+        </details>
+        <details class="ai-scenario">
+          <summary>Synthesise existing team thinking</summary>
+          <p>
+            Organise an existing fishbone diagram, engagement findings or
+            workshop outputs into a proposed theory of change. Preserve the
+            team's language, and make disagreement or uncertainty visible.
+          </p>
+        </details>
+        <details class="ai-scenario">
+          <summary>Explore possible approaches</summary>
+          <p>
+            Explore plausible drivers and possible changes for a complex
+            objective. Use the result to identify questions and people to
+            involve, not as an agreed plan for implementation.
+          </p>
+        </details>
+      </div>
+
+      <p class="ai-workflow-note">
+        <strong>Before using any AI-generated diagram:</strong> Review the
+        wording, relationships, evidence and proposed changes with your
+        improvement group. A polished diagram is not proof of an agreed or
+        valid theory of change.
+      </p>
+
+      <!-- B5.3b — Editable prompt builder. No project data is collected. -->
+      <section class="ai-prompt-builder" aria-labelledby="aiPromptHeading">
+        <h3 id="aiPromptHeading">Build your AI prompt</h3>
+        <p>
+          Choose an approach and a few preferences, then create a prompt.
+          You can review and edit the wording before copying it into an AI
+          service approved by your organisation for this task.
+        </p>
+        <p class="ai-builder-privacy">
+          <strong>Do not enter project documents, identifiable details or
+          confidential information here.</strong> Add suitable source material
+          only in your approved AI environment, following local IG rules.
+        </p>
+
+        <div class="ai-builder-grid">
+          <div>
+            <label for="aiPromptScenario">What would you like AI to do?</label>
+            <select id="aiPromptScenario">
+              <option value="draft">Create an initial draft</option>
+              <option value="synthesis">Synthesise existing team thinking</option>
+              <option value="explore">Explore possible approaches</option>
+            </select>
+          </div>
+          <div>
+            <label for="aiPromptWording">Wording</label>
+            <select id="aiPromptWording">
+              <option value="preserve">Preserve the source language (recommended)</option>
+              <option value="clarify">Suggest clearer wording, retaining meaning</option>
+              <option value="alternatives">Offer alternative wording for discussion</option>
+            </select>
+          </div>
+          <div>
+            <label for="aiPromptMeasures">Measures</label>
+            <select id="aiPromptMeasures">
+              <option value="none">Do not include measures (recommended)</option>
+              <option value="existing">Only measures in the source material</option>
+              <option value="few">Suggest a few measures for discussion</option>
+            </select>
+          </div>
+          <div>
+            <label for="aiPromptChanges">Change ideas</label>
+            <select id="aiPromptChanges">
+              <option value="existing">Use existing change ideas (recommended)</option>
+              <option value="none">Do not include change ideas</option>
+              <option value="suggest">Suggest some change ideas for discussion</option>
+            </select>
+          </div>
+          <div>
+            <label for="aiPromptColours">Colours</label>
+            <select id="aiPromptColours">
+              <option value="app">Leave colours to the app (recommended)</option>
+              <option value="branch">Colour by primary-driver branch</option>
+              <option value="level">Colour by diagram level</option>
+              <option value="custom">Ask me for a colour scheme</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ai-builder-actions">
+          <button type="button" id="aiBuildPrompt">Create / update prompt</button>
+          <button type="button" id="aiResetPrompt" class="secondary" disabled>
+            Restore suggested wording
+          </button>
+          <button type="button" id="aiCopyPrompt" class="secondary" disabled>
+            Copy prompt
+          </button>
+          <span id="aiCopyFeedback" class="ai-copy-feedback"
+                aria-hidden="true" hidden></span>
+        </div>
+
+        <label for="aiPromptEditor">Review and edit your prompt</label>
+        <textarea id="aiPromptEditor" rows="16" autocomplete="off"
+          spellcheck="true" placeholder="Select Create / update prompt above."></textarea>
+        <p class="ai-builder-status" id="aiPromptStatus" role="status"
+          aria-live="polite"></p>
+
+        <p class="ai-builder-footnote">
+          Changing a preference does not overwrite your edits. Select
+          <strong>Create / update prompt</strong> to apply your choices.
+          The AI should ask questions and wait for your answers before drafting.
+          Once you are happy with the draft, choose the CSV option when offered,
+          or tell the chatbot <strong>"Generate the CSV now"</strong>.
+          Copy the CSV output into <strong>Paste your diagram CSV</strong>
+          below; you do not need to create a separate file.
+        </p>
+      </section>
+
+      <!-- B5.3c — Paste AI-generated CSV without making a file. -->
+      <section class="ai-csv-paste" aria-labelledby="aiCsvPasteHeading">
+        <h3 id="aiCsvPasteHeading">Paste your diagram CSV</h3>
+
+        <p>
+          When you're happy with the draft, ask your AI chatbot to generate
+          the importable CSV. Copy its CSV response and paste it below.
+          You may include the surrounding <strong>```csv</strong> code fence.
+        </p>
+
+        <label for="aiCsvPasteInput">AI-generated CSV</label>
+
+        <textarea id="aiCsvPasteInput"
+                  rows="8"
+                  spellcheck="false"
+                  placeholder="id,level,parent_id,text"></textarea>
+
+        <div class="ai-builder-actions">
+          <button type="button" id="aiImportPastedCsv">
+            Import pasted CSV
+          </button>
+
+          <button type="button" id="aiClearPastedCsv" class="secondary">
+            Clear
+          </button>
+        </div>
+
+        <p id="aiCsvPasteStatus"
+           role="status"
+           aria-live="polite"></p>
+
+        <p class="ai-csv-safety">
+          <strong>Before importing:</strong> save your existing diagram if
+          needed. A successful import replaces it. Only paste diagram CSV,
+          not meeting notes, chatbot conversations or confidential information.
+          The usual CSV validation checks will run before anything is replaced.
+        </p>
+      </section>
+
+      <p class="ai-guidance-links">
+        Further guidance:
+        <a href="https://digital.nhs.uk/data-and-information/information-governance/guidance/artificial-intelligence/guidance-for-health-and-care-professionals"
+           target="_blank" rel="noopener noreferrer">NHS England: AI and information governance</a>;
+        <a href="https://digital.nhs.uk/data-and-information/information-governance/templates/microsoft-365-copilot-template-dpia"
+           target="_blank" rel="noopener noreferrer">NHS England: Copilot DPIA guidance</a>;
+        <a href="https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/artificial-intelligence/guidance-on-ai-and-data-protection/about-this-guidance/"
+           target="_blank" rel="noopener noreferrer">ICO: AI and data protection</a>.
+      </p>
+    </div>
+  </details>
+
+  </div>
+
+</dialog>
+
 <!-- Help modal -->
+
 <div id="helpOverlay" class="modal-overlay" aria-hidden="true">
   <div
     class="modal-dialog"
@@ -957,7 +726,7 @@ label.file-action-button {
     <p>
       The diagram updates as you add, edit, move, connect or colour items.
       You can save an editable copy of your work or download the finished
-      diagram as an image or PDF.
+      diagram as a PNG, SVG or PDF.
     </p>
 
     <p class="faq-question">1. Understanding the diagram</p>
@@ -985,19 +754,23 @@ label.file-action-button {
       drivers, which together support the overall aim.
     </p>
 
+
     <p class="faq-question">2. Adding items</p>
 
     <ul>
       <li>
-        Use the <strong>+</strong> button on a box to add an item at the
-        next level.
+        Click the <strong>+</strong> button on a box to create an item
+        at the next level. It appears connected to its parent automatically.
       </li>
       <li>
-        The new item appears in the correct column and is connected to
-        its parent automatically.
+        Type directly into the new box, then click <strong>✓</strong>
+        to confirm or <strong>×</strong> to discard it.
+        You can also use <strong>Ctrl+Enter</strong> to confirm or
+        <strong>Escape</strong> to cancel.
       </li>
       <li>
-        New items may inherit the colour of their parent.
+        New items inherit their parent's colour. Use the palette button
+        while editing to choose a different colour.
       </li>
     </ul>
 
@@ -1005,38 +778,51 @@ label.file-action-button {
 
     <ul>
       <li>
-        Click the text inside a box to edit it.
+        Click a box once to select it. Click the <strong>pencil</strong>
+        icon or double-click the box to edit its text directly.
       </li>
       <li>
-        Click a column heading to rename it.
+        Click <strong>✓</strong> to save an edit or <strong>×</strong>
+        to cancel it. <strong>Ctrl+Enter</strong> and
+        <strong>Escape</strong> work too.
       </li>
       <li>
-        Right-click an item to see more actions.
+        Drag a driver or change idea to reorder it among items with
+        the same parent. You cannot drag it into a different branch.
       </li>
       <li>
-        Use the organising options to move an item up, down, to the top
-        or to the bottom of its group.
+        Click a column heading to rename it. Boxes expand to fit longer
+        text by default.
       </li>
       <li>
-        Use <strong>Toggle auto-size to text</strong> when a box contains
-        longer text.
+        Use <strong>Undo</strong> and <strong>Redo</strong> at the top
+        of the page to reverse or restore changes. The right-click menu
+        remains available for additional actions.
       </li>
     </ul>
 
-    <p class="faq-question">4. Adding measures</p>
+
+ 
+    <p class="faq-question">4. Adding and managing measures</p>
 
     <ul>
       <li>
-        Right-click an item and open <strong>Measures</strong>.
+        Use <strong>Add measure</strong> beneath a box to add a measure.
+        The control appears when you hover over the box or its measures.
       </li>
       <li>
-        You can add an outcome, process or balancing measure.
+        Choose an <strong>outcome</strong>, <strong>process</strong>
+        or <strong>balancing</strong> measure, or leave the type unspecified.
+        Measures appear beneath their related box.
       </li>
       <li>
-        Measures appear underneath the related box.
+        Click a measure to select it, or double-click to edit it.
+        Drag measures up or down to reorder them within the same box.
       </li>
       <li>
-        The measures key explains the colour used for each measure type.
+        You can also use <strong>Alt+Up</strong> or
+        <strong>Alt+Down</strong> to reorder a focused measure.
+        The measures key explains the coloured bullets.
       </li>
     </ul>
 
@@ -1044,31 +830,34 @@ label.file-action-button {
 
     <ul>
       <li>
-        Open <strong>Colours and key</strong> in the editing panel to
-        add, rename or remove colours.
+        Open <strong>Colours and key</strong> in the editing panel
+        to add, rename or remove named colours.
       </li>
       <li>
-        Right-click a box and choose <strong>Change colour</strong> to
-        apply one of your saved colours.
+        While editing a box, click the <strong>palette</strong> icon
+        at the bottom-left to choose an existing colour, remove its colour
+        or create a new named colour.
       </li>
       <li>
-        Colours can be used to show themes, workstreams, teams,
-        priorities or ownership.
+        The selected colour is previewed immediately. Click
+        <strong>✓</strong> to confirm the text and colour together,
+        or <strong>×</strong> to cancel both changes.
       </li>
       <li>
-        The key updates automatically as colours are changed.
+        Colours can show themes, workstreams, teams or priorities.
+        The key updates automatically when changes are confirmed.
       </li>
       <li>
-        Use <strong>Hide key</strong> or <strong>Show key</strong> at the
-        top of the screen to control whether it is displayed.
+        Use the eye icon just below the key to hide or show it.
       </li>
     </ul>
+
 
     <p class="faq-question">6. Diagram style</p>
 
     <ul>
       <li>
-        Open <strong>Diagram style</strong> in the editing panel.
+        Open <strong>Diagram appearance</strong> in the editing panel.
       </li>
       <li>
         You can adjust box height, spacing, font size, font family and
@@ -1152,20 +941,21 @@ label.file-action-button {
 
     <ul>
       <li>
-        Use <strong>Download image</strong> to create a PNG image for
-        presentations, reports or documents.
+        Choose <strong>Export chart</strong> in the top toolbar. Select
+        <strong>PNG</strong> for presentations, <strong>SVG</strong> for a
+        scalable vector image, or <strong>PDF</strong> for professional sharing
+        and printing.
       </li>
       <li>
-        Use <strong>Download PDF</strong> to create a PDF version for
-        sharing or printing.
+        The PDF option opens a print-ready view with A3, A2 and A1 landscape
+        choices and a text-readability estimate. Select
+        <strong>Print / Save as PDF</strong>, then choose your browser's
+        <strong>Save as PDF</strong> destination. Check paper size and enable
+        background graphics if your print dialog requires it.
       </li>
       <li>
-        Editing controls are hidden automatically from downloaded images
-        and PDFs.
-      </li>
-      <li>
-        The diagram, measures and key are included in the downloaded output
-        when they are visible.
+        Editing controls are excluded from exported charts, and the diagram,
+        measures and visible key are included.
       </li>
     </ul>
 
@@ -1173,23 +963,76 @@ label.file-action-button {
 
     <ul>
       <li>
-        <strong>Hide editing panel:</strong> gives the diagram more room
-        on the screen.
+        Use the panel icon in the top toolbar to hide or restore the
+        editing panel and give the diagram more space.
       </li>
       <li>
-        <strong>Show editing panel:</strong> brings the editing options
-        back.
-      </li>
-      <li>
-        <strong>Hide key:</strong> removes the colour and measures key
-        from view and from the downloaded output.
+        Use the eye icon just below the key to hide or restore the colour
+        and measures key. A hidden key is excluded from exports.
       </li>
       <li>
         <strong>Help:</strong> opens this guidance.
       </li>
     </ul>
 
+
+    <p class="faq-question">12. Using Diagram and Outline views</p>
+
+    <ul>
+      <li>
+        Use <strong>Diagram</strong> and <strong>Outline</strong>
+        to switch between the visual diagram and a hierarchical
+        list of the same information.
+      </li>
+      <li>
+        In Outline, expand a branch using its arrow. Select an
+        element's text to locate its box in Diagram view.
+      </li>
+      <li>
+        Select <strong>Edit</strong> to change text or
+        <strong>+ Add child</strong> to create the next level.
+        Save or Cancel your changes before switching views.
+      </li>
+      <li>
+        Open <strong>Actions</strong> to add a measure, change
+        a colour, delete an element, or move an element up
+        or down among siblings with the same parent.
+      </li>
+      <li>
+        Use a measure's <strong>Edit</strong> button to update
+        or delete it. Undo and Redo also work for changes made
+        in Outline.
+      </li>
+      <li>
+        On smaller screens, Outline is designed for touch and
+        keyboard use. Diagram view keeps four columns and can
+        be scrolled sideways.
+      </li>
+      <li>
+        To export PNG, SVG or PDF, the tool uses the visual Diagram
+        view. Save editable HTML or CSV backups to keep working
+        on your diagram.
+      </li>
+    </ul>
+
+
+    <h3>AI-assisted diagram development (optional)</h3>
+    <p>
+      Select <strong>AI guidance</strong> in the top toolbar to open the
+      AI-assisted diagram development window. This guidance does not
+      contact an AI service.
+    </p>
+    <p>
+      Use only an AI service authorised by your organisation for the intended
+      information and task. Review any AI-generated theory of change with the
+      improvement group; the group retains ownership of the diagram.
+      Once the chatbot has produced CSV, copy the CSV into the
+      <strong>Paste your diagram CSV</strong> section of the AI guidance
+      window and select <strong>Import pasted CSV</strong>.    </p>
+
     <h3>Information governance</h3>
+
+
 
     <p>
       Saved HTML and CSV files contain the text and data entered into the

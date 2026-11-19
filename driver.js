@@ -20,8 +20,25 @@ var diagramAppearance = {
   verticalGap: 8,     // px between boxes
   fontSize: 13,       // px
   fontFamily: "",      // empty = inherit from page
-  fontBold: false
+  fontBold: false,
+  connectionStyle: "bezier"
 };
+
+
+/* B2.5: Supported connection styles */
+
+function normaliseConnectionStyle(value) {
+  if (
+    value === "straight" ||
+    value === "orthogonal" ||
+    value === "bezier"
+  ) {
+    return value;
+  }
+
+  // Compatibility with diagrams saved before B2.5.
+  return "bezier";
+}
 
 
 // View state
@@ -88,7 +105,7 @@ function createNode(options) {
     text: text,
     parentId: parentId,
     color: color,
-    autoSize: !!options.autoSize,
+    autoSize: options.autoSize == null ? true : !!options.autoSize,
     measures: Array.isArray(options.measures) ? options.measures : []
   };
 }
@@ -133,6 +150,7 @@ function addMeasureToNode(nodeId) {
 
   // ---- Build a small modal dialog ----
   var overlay = document.createElement("div");
+  overlay.className = "diagram-measure-editor-overlay";
   overlay.style.position = "fixed";
   overlay.style.left = "0";
   overlay.style.top = "0";
@@ -281,13 +299,20 @@ function addMeasureToNode(nodeId) {
   setTimeout(function () { textInput.focus(); }, 0);
 
   // Allow Escape to close
+
   function escHandler(e) {
-    if (e.key === "Escape") {
-      if (overlay.parentNode) document.body.removeChild(overlay);
-      document.removeEventListener("keydown", escHandler);
+    if (e.key !== "Escape") return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (overlay.parentNode) {
+      overlay.remove();
     }
   }
-  document.addEventListener("keydown", escHandler);
+
+  // The listener is removed automatically with the editor.
+  overlay.addEventListener("keydown", escHandler);
 }
 
 function editMeasureOnNode(nodeId, measureIndex) {
@@ -302,6 +327,7 @@ function editMeasureOnNode(nodeId, measureIndex) {
 
   // ---- Build a small modal dialog (same style as addMeasureToNode) ----
   var overlay = document.createElement("div");
+overlay.className = "diagram-measure-editor-overlay";
   overlay.style.position = "fixed";
   overlay.style.left = "0";
   overlay.style.top = "0";
@@ -435,8 +461,37 @@ function editMeasureOnNode(nodeId, measureIndex) {
     updateAllViews();
   });
 
+  
+  // B2.4: Delete the measure directly from its editor.
+  var deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.textContent = "Delete measure";
+  deleteBtn.title = "Delete this measure";
+  deleteBtn.style.padding = "8px 12px";
+  deleteBtn.style.marginRight = "auto";
+  deleteBtn.style.borderRadius = "8px";
+  deleteBtn.style.border = "1px solid #b91c1c";
+  deleteBtn.style.background = "#ffffff";
+  deleteBtn.style.color = "#b91c1c";
+  deleteBtn.style.cursor = "pointer";
+
+  deleteBtn.addEventListener("click", function () {
+    // Reuse the existing confirmation and deletion logic.
+    deleteMeasureOnNode(nodeId, measureIndex);
+
+    // Keep the editor open if deletion was cancelled.
+    // Close it only if this exact measure was removed.
+    if (n.measures.indexOf(m) === -1) {
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    }
+  });
+
+  btnRow.appendChild(deleteBtn);
   btnRow.appendChild(cancelBtn);
   btnRow.appendChild(saveBtn);
+
   dialog.appendChild(btnRow);
 
   overlay.appendChild(dialog);
@@ -444,16 +499,281 @@ function editMeasureOnNode(nodeId, measureIndex) {
 
   setTimeout(function () { textInput.focus(); }, 0);
 
+
   function escHandler(e) {
-    if (e.key === "Escape") {
-      if (overlay.parentNode) document.body.removeChild(overlay);
-      document.removeEventListener("keydown", escHandler);
+    if (e.key !== "Escape") return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (overlay.parentNode) {
+      overlay.remove();
     }
   }
-  document.addEventListener("keydown", escHandler);
+
+  // The listener is removed automatically with the editor.
+  overlay.addEventListener("keydown", escHandler);
+}
+
+
+/* B4.2d — Reorder measures within their own element. */
+
+var draggingDiagramMeasure = null;
+var diagramMeasureDropRow = null;
+
+function clearDiagramMeasureDropMarker() {
+  if (diagramMeasureDropRow) {
+    diagramMeasureDropRow.classList.remove(
+      "diagram-measure-drop-before",
+      "diagram-measure-drop-after"
+    );
+    diagramMeasureDropRow = null;
+  }
+}
+
+function reorderMeasuresWithinNode(
+  nodeId, fromIndex, toIndex, placeAfter
+) {
+  var node = nodes.find(function (n) {
+    return n.id === nodeId;
+  });
+
+  if (
+    !node ||
+    !Array.isArray(node.measures) ||
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= node.measures.length ||
+    toIndex >= node.measures.length ||
+    activeDiagramTextEdit ||
+    document.querySelector(
+      "dialog[open], .diagram-measure-editor-overlay"
+    )
+  ) {
+    return false;
+  }
+
+  var measures = node.measures;
+  var previous = measures.slice();
+
+  // Remember which measure was selected, not just its index.
+  var selected =
+    selectedDiagramMeasure &&
+    selectedDiagramMeasure.nodeId === nodeId
+      ? measures[selectedDiagramMeasure.index]
+      : null;
+
+  var target = measures[toIndex];
+  var moved = measures.splice(fromIndex, 1)[0];
+
+  measures.splice(
+    measures.indexOf(target) + (placeAfter ? 1 : 0),
+    0,
+    moved
+  );
+
+  // No history entry for a drag that changed nothing.
+  if (measures.every(function (m, i) {
+    return m === previous[i];
+  })) {
+    return false;
+  }
+
+  // Keep selection attached to the same measure.
+  if (selected) {
+    selectedDiagramMeasure.index =
+      measures.indexOf(selected);
+  }
+
+  closeMeasureContextMenu();
+
+  // A completed move creates one Undo entry.
+  updateAllViews();
+  return true;
+}
+
+function enableMeasureReordering(wrap, node) {
+  if (!Array.isArray(node.measures) ||
+      node.measures.length < 2) return;
+
+  var rows = Array.from(
+    wrap.querySelectorAll(".diagram-measure-row")
+  );
+
+  rows.forEach(function (row, index) {
+    row.draggable = true;
+    row.classList.add("diagram-measure-sortable");
+
+    row.title =
+      "Drag to reorder. Alt + Up/Down also moves this measure.";
+
+
+    row.addEventListener("dragstart", function (event) {
+      if (
+        activeDiagramTextEdit ||
+        document.querySelector(
+          "dialog[open], .diagram-measure-editor-overlay"
+        )
+      ) {
+        event.preventDefault();
+        return;
+      }
+
+      draggingDiagramMeasure = {
+        nodeId: node.id,
+        index: index
+      };
+
+      row.classList.add("diagram-measure-dragging");
+      closeMeasureContextMenu();
+      event.stopPropagation();
+
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(
+          "text/plain",
+          "measure:" + node.id + ":" + index
+        );
+      }
+    });
+
+    row.addEventListener("dragend", function () {
+      draggingDiagramMeasure = null;
+      clearDiagramMeasureDropMarker();
+      row.classList.remove("diagram-measure-dragging");
+    });
+
+    // Keyboard alternative: Alt + Up or Down.
+    row.addEventListener("keydown", function (event) {
+      if (
+        !event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        (
+          event.key !== "ArrowUp" &&
+          event.key !== "ArrowDown"
+        )
+      ) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      var step =
+        event.key === "ArrowUp" ? -1 : 1;
+
+      var nextIndex = index + step;
+
+      if (
+        nextIndex < 0 ||
+        nextIndex >= rows.length
+      ) return;
+
+      if (reorderMeasuresWithinNode(
+        node.id, index, nextIndex, step > 0
+      )) {
+        // Restore focus after rendering recreates the rows.
+        document.querySelectorAll(
+          ".diagram-measure-row"
+        ).forEach(function (candidate) {
+          if (
+            candidate.dataset.nodeId === node.id &&
+            Number(candidate.dataset.measureIndex) ===
+              nextIndex
+          ) {
+            candidate.focus();
+          }
+        });
+      }
+    });
+  });
+
+  // Find the nearest measure, including small gaps.
+  function closestRow(event) {
+    var nearest = null;
+    var distance = Infinity;
+
+    rows.forEach(function (row) {
+      var rect = row.getBoundingClientRect();
+
+      var gap = Math.max(
+        rect.top - event.clientY,
+        0,
+        event.clientY - rect.bottom
+      );
+
+      if (gap < distance) {
+        distance = gap;
+        nearest = {
+          row: row,
+          index: Number(row.dataset.measureIndex),
+          after: event.clientY >=
+            rect.top + rect.height / 2
+        };
+      }
+    });
+
+    return nearest;
+  }
+
+  wrap.addEventListener("dragover", function (event) {
+    if (
+      !draggingDiagramMeasure ||
+      draggingDiagramMeasure.nodeId !== node.id
+    ) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+
+    var target = closestRow(event);
+    clearDiagramMeasureDropMarker();
+
+    if (
+      !target ||
+      target.index === draggingDiagramMeasure.index
+    ) return;
+
+    diagramMeasureDropRow = target.row;
+
+    target.row.classList.add(
+      target.after
+        ? "diagram-measure-drop-after"
+        : "diagram-measure-drop-before"
+    );
+  });
+
+  wrap.addEventListener("drop", function (event) {
+    if (
+      !draggingDiagramMeasure ||
+      draggingDiagramMeasure.nodeId !== node.id
+    ) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    var source = draggingDiagramMeasure;
+    var target = closestRow(event);
+
+    draggingDiagramMeasure = null;
+    clearDiagramMeasureDropMarker();
+
+    if (target) {
+      reorderMeasuresWithinNode(
+        node.id,
+        source.index,
+        target.index,
+        target.after
+      );
+    }
+  });
 }
 
 function deleteMeasureOnNode(nodeId, measureIndex) {
+
   var n = nodes.find(function (x) { return x.id === nodeId; });
   if (!n) return;
   if (!Array.isArray(n.measures) || !n.measures.length) {
@@ -466,6 +786,11 @@ function deleteMeasureOnNode(nodeId, measureIndex) {
   var msg = "Delete this measure?\n\n" + (m.text || "");
   if (!window.confirm(msg)) return;
 
+if (selectedDiagramMeasure &&
+    selectedDiagramMeasure.nodeId === nodeId) {
+  clearSelectedDiagramMeasure();
+}
+
   n.measures.splice(measureIndex, 1);
   updateAllViews();
 }
@@ -476,6 +801,11 @@ function clearMeasuresFromNode(nodeId) {
   if (!n.measures || !n.measures.length) return;
 
   if (!window.confirm("Remove all measures from this item?")) return;
+
+if (selectedDiagramMeasure &&
+    selectedDiagramMeasure.nodeId === nodeId) {
+  clearSelectedDiagramMeasure();
+}
   n.measures = [];
   updateAllViews();
 }
@@ -488,225 +818,57 @@ function getLevelLabel(level) {
   return level;
 }
 
-/* ---------- Colour helpers ---------- */
+/* ---------- Colours and key: one shared popup ---------- */
 
-// Colour options: { label, value } where value is a hex colour (e.g. "#ffcc00")
+// Saved colours are identified by their hex values in existing diagrams.
 var colorOptions = [];
-
-// Track which colour is being edited using a stable key (the hex value), not an array index
-var editingColorValue = null;
-
-// Default shown when adding a new colour
+var editingColorValue = null; // Retained for older history/clear paths.
 var defaultNewColorValue = "#fff7cc";
 
 function findColorOptionByValue(value) {
   if (!value) return null;
-
   return colorOptions.find(function (option) {
-    return (
-      (option.value || "").toLowerCase() ===
-      value.toLowerCase()
-    );
+    return (option.value || "").toLowerCase() ===
+      String(value).toLowerCase();
   }) || null;
 }
 
-function getColorEditorElements() {
-  return {
-    title: document.getElementById("colorEditorTitle"),
-    labelInput: document.getElementById("colorLabelInput"),
-    valueInput: document.getElementById("colorValueInput"),
-    saveButton: document.getElementById("addColorBtn"),
-    cancelButton: document.getElementById("cancelColorEditBtn"),
-    status: document.getElementById("colorEditStatus")
-  };
+function resetColorEditorForm() {
+  // Compatibility with saved-project import and Undo/Redo.
+  editingColorValue = null;
+}
+
+function isColorEditorDirty() {
+  // The modal dialog now owns all unfinished colour edits.
+  return false;
 }
 
 function setColorEditorStatus(message, type) {
   var status = document.getElementById("colorEditStatus");
   if (!status) return;
-
   status.textContent = message || "";
-
-  status.classList.remove(
-    "is-warning",
-    "is-success"
-  );
-
-  if (type === "warning") {
-    status.classList.add("is-warning");
-  }
-
-  if (type === "success") {
-    status.classList.add("is-success");
-  }
-}
-
-function isColorEditorDirty() {
-  if (!editingColorValue) return false;
-
-  var elements = getColorEditorElements();
-  var option = findColorOptionByValue(editingColorValue);
-
-  if (
-    !option ||
-    !elements.labelInput ||
-    !elements.valueInput
-  ) {
-    return false;
-  }
-
-  var currentLabel =
-    (elements.labelInput.value || "").trim();
-
-  var currentValue =
-    (elements.valueInput.value || "").toLowerCase();
-
-  return (
-    currentLabel !== option.label ||
-    currentValue !==
-      (option.value || "").toLowerCase()
-  );
-}
-
-function updateColorEditorUi() {
-  var elements = getColorEditorElements();
-  var option = findColorOptionByValue(editingColorValue);
-
-  /*
-    If the colour no longer exists, return safely to
-    add mode.
-  */
-  if (editingColorValue && !option) {
-    editingColorValue = null;
-  }
-
-  var isEditing = !!editingColorValue;
-
-  if (elements.title) {
-    elements.title.textContent = isEditing
-      ? "Edit colour: " + option.label
-      : "Add a new colour";
-  }
-
-  if (elements.saveButton) {
-    elements.saveButton.textContent = isEditing
-      ? "Save changes"
-      : "Add colour";
-
-    /*
-      While editing, Save changes remains disabled until
-      something has actually changed.
-    */
-    elements.saveButton.disabled =
-      isEditing && !isColorEditorDirty();
-  }
-
-  if (elements.cancelButton) {
-    elements.cancelButton.hidden = !isEditing;
-  }
-}
-
-function handleColorEditorInput() {
-  updateColorEditorUi();
-
-  if (!editingColorValue) {
-    setColorEditorStatus("");
-    return;
-  }
-
-  var option = findColorOptionByValue(editingColorValue);
-
-  if (isColorEditorDirty()) {
-    setColorEditorStatus(
-      "Unsaved changes",
-      "warning"
-    );
-  } else if (option) {
-    setColorEditorStatus(
-      'Editing "' + option.label +
-      '". Change the name or colour, then select Save changes.'
-    );
-  }
-}
-
-function resetColorEditorForm() {
-  var elements = getColorEditorElements();
-
-  editingColorValue = null;
-
-  if (elements.labelInput) {
-    elements.labelInput.value = "";
-  }
-
-  if (elements.valueInput) {
-    elements.valueInput.value =
-      defaultNewColorValue;
-  }
-
-  setColorEditorStatus("");
-  updateColorEditorUi();
 }
 
 function beginColorEdit(value) {
-  var option = findColorOptionByValue(value);
-  if (!option) return;
-
-  /*
-    Protect unsaved work if the user selects Edit on a
-    different colour.
-  */
-  if (
-    editingColorValue &&
-    editingColorValue.toLowerCase() !==
-      value.toLowerCase() &&
-    isColorEditorDirty()
-  ) {
-    var discard = window.confirm(
-      "You have unsaved colour changes. " +
-      "Discard them and edit another colour?"
-    );
-
-    if (!discard) return;
-  }
-
-  var elements = getColorEditorElements();
-
-  editingColorValue = option.value;
-
-  if (elements.labelInput) {
-    elements.labelInput.value = option.label;
-  }
-
-  if (elements.valueInput) {
-    elements.valueInput.value = option.value;
-  }
-
-  updateColorEditorUi();
-
-  setColorEditorStatus(
-    'Editing "' + option.label +
-    '". Change the name or colour, then select Save changes.'
-  );
-
-  renderColorOptionsList();
-
-  if (elements.labelInput) {
-    elements.labelInput.focus();
-    elements.labelInput.select();
-  }
-}
-
-function cancelColorEdit() {
-  resetColorEditorForm();
-  renderColorOptionsList();
-
-  setColorEditorStatus(
-    "Editing cancelled."
-  );
+  if (!findColorOptionByValue(value)) return;
+  openQuickColourDialogForNode(null, { editValue: value });
 }
 
 function initialiseColorEditor() {
-  resetColorEditorForm();
+  var addButton = document.getElementById("btnSidebarColourPalette");
+  if (addButton) {
+    addButton.addEventListener("click", function () {
+      openQuickColourDialogForNode(null);
+    });
+  }
+
+  var helpButton = document.getElementById("colourHelpButton");
+  if (helpButton) {
+    // The help tooltip sits in a collapsible heading: don't toggle that heading.
+    helpButton.addEventListener("click", function (event) {
+      event.stopPropagation();
+    });
+  }
   renderColorOptionsList();
 }
 
@@ -715,388 +877,124 @@ function refreshColorSelect() {
   if (!select) return;
 
   var currentValue = select.value;
-
   select.innerHTML = "";
-  var noneOption = document.createElement("option");
-  noneOption.value = "";
-  noneOption.textContent = "No colour";
-  select.appendChild(noneOption);
+  var noColour = document.createElement("option");
+  noColour.value = "";
+  noColour.textContent = "No colour";
+  select.appendChild(noColour);
 
   colorOptions.forEach(function (opt) {
-    var option = document.createElement("option");
-    option.value = opt.value;
-    option.textContent = opt.label + " (" + opt.value + ")";
-    select.appendChild(option);
+    var item = document.createElement("option");
+    item.value = opt.value;
+    item.textContent = opt.label + " (" + opt.value + ")";
+    select.appendChild(item);
   });
 
-  if (
-    currentValue &&
-    (currentValue === "" ||
-      colorOptions.some(function (c) {
-        return c.value === currentValue;
-      }))
-  ) {
-    select.value = currentValue;
-  }
+  if (Array.from(select.options).some(function (item) {
+    return item.value === currentValue;
+  })) select.value = currentValue;
 }
 
 function deleteColorOptionByValue(value) {
-  if (!value) return;
-
   var option = findColorOptionByValue(value);
   if (!option) return;
 
   var usageCount = nodes.filter(function (node) {
-    return (
-      (node.color || "").toLowerCase() ===
-      value.toLowerCase()
-    );
+    return (node.color || "").toLowerCase() ===
+      value.toLowerCase();
   }).length;
 
-  var message =
-    'Delete the colour "' + option.label + '"?';
-
-  if (usageCount > 0) {
-    message +=
-      "\n\nIt is currently used on " +
-      usageCount +
+  var message = 'Delete the colour "' + option.label + '"?';
+  if (usageCount) {
+    message += "\n\nIt is used on " + usageCount +
       (usageCount === 1 ? " box." : " boxes.") +
-      " Those boxes will return to having no colour.";
+      " These boxes will return to having no colour.";
   }
-
   if (!window.confirm(message)) return;
 
-  colorOptions = colorOptions.filter(function (item) {
-    return (
-      (item.value || "").toLowerCase() !==
-      value.toLowerCase()
-    );
+  colorOptions = colorOptions.filter(function (entry) {
+    return (entry.value || "").toLowerCase() !== value.toLowerCase();
   });
-
   nodes.forEach(function (node) {
-    if (
-      (node.color || "").toLowerCase() ===
-      value.toLowerCase()
-    ) {
+    if ((node.color || "").toLowerCase() === value.toLowerCase()) {
       node.color = "";
     }
   });
 
-  var deletedCurrentColour =
-    editingColorValue &&
-    editingColorValue.toLowerCase() ===
-      value.toLowerCase();
-
-  if (deletedCurrentColour) {
-    resetColorEditorForm();
-  }
-
   updateAllViews();
-
-  setColorEditorStatus(
-    'Colour "' + option.label + '" deleted.',
-    "success"
-  );
+  setColorEditorStatus('Colour "' + option.label + '" deleted.', "success");
 }
 
 function renderColorOptionsList() {
-  updateColorEditorUi();
-
-  var list =
-    document.getElementById("colorOptionsList");
-
+  var list = document.getElementById("colorOptionsList");
   if (!list) return;
-
   list.innerHTML = "";
 
-  if (colorOptions.length === 0) {
-    var emptyItem = document.createElement("li");
-
-    emptyItem.className =
-      "colour-options-empty";
-
-    emptyItem.textContent =
-      "No colours have been added yet.";
-
-    list.appendChild(emptyItem);
+  if (!colorOptions.length) {
+    var empty = document.createElement("li");
+    empty.className = "colour-options-empty";
+    empty.textContent = "No colours added yet.";
+    list.appendChild(empty);
     return;
   }
 
   colorOptions.forEach(function (option) {
-    var listItem =
-      document.createElement("li");
+    var row = document.createElement("li");
+    row.className = "colour-option-row";
 
-    listItem.className =
-      "colour-option-row";
+    var swatch = document.createElement("span");
+    swatch.className = "colour-option-swatch";
+    swatch.style.backgroundColor = option.value;
+    swatch.title = option.value.toUpperCase();
 
-    var isEditingThisColour =
-      editingColorValue &&
-      (option.value || "").toLowerCase() ===
-        editingColorValue.toLowerCase();
-
-    if (isEditingThisColour) {
-      listItem.classList.add("is-editing");
-    }
-
-    var swatch =
-      document.createElement("span");
-
-    swatch.className =
-      "colour-option-swatch";
-
-    swatch.style.backgroundColor =
-      option.value;
-
-    swatch.title = option.value;
-
-    var details =
-      document.createElement("div");
-
-    details.className =
-      "colour-option-details";
-
-    var name =
-      document.createElement("span");
-
-    name.className =
-      "colour-option-name";
-
+    var name = document.createElement("span");
+    name.className = "colour-option-name";
     name.textContent = option.label;
 
-    var valueText =
-      document.createElement("span");
+    var actions = document.createElement("span");
+    actions.className = "colour-option-actions";
 
-    valueText.className =
-      "colour-option-value";
-
-    valueText.textContent = option.value;
-
-    details.appendChild(name);
-    details.appendChild(valueText);
-
-    var actions =
-      document.createElement("div");
-
-    actions.className =
-      "colour-option-actions";
-
-    var editButton =
-      document.createElement("button");
-
+    var editButton = document.createElement("button");
     editButton.type = "button";
-    editButton.className =
-      "colour-row-button";
+    editButton.className = "colour-row-button";
+    editButton.textContent = "Edit";
+    editButton.setAttribute("aria-label", "Edit " + option.label);
+    editButton.addEventListener("click", function () {
+      beginColorEdit(option.value);
+    });
 
-    editButton.textContent =
-      isEditingThisColour
-        ? "Editing"
-        : "Edit";
-
-    editButton.disabled =
-      !!isEditingThisColour;
-
-    editButton.setAttribute(
-      "aria-label",
-      "Edit " + option.label
-    );
-
-    editButton.addEventListener(
-      "click",
-      function () {
-        beginColorEdit(option.value);
-      }
-    );
-
-    var deleteButton =
-      document.createElement("button");
-
+    var deleteButton = document.createElement("button");
     deleteButton.type = "button";
-    deleteButton.className =
-      "colour-row-button delete";
-
-    deleteButton.textContent = "Delete";
-
-    deleteButton.setAttribute(
-      "aria-label",
-      "Delete " + option.label
-    );
-
-    deleteButton.addEventListener(
-      "click",
-      function () {
-        deleteColorOptionByValue(
-          option.value
-        );
-      }
-    );
+    deleteButton.className = "colour-row-button delete";
+    deleteButton.textContent = "🗑";
+    deleteButton.title = "Delete " + option.label;
+    deleteButton.setAttribute("aria-label", "Delete " + option.label);
+    deleteButton.addEventListener("click", function () {
+      deleteColorOptionByValue(option.value);
+    });
 
     actions.appendChild(editButton);
     actions.appendChild(deleteButton);
-
-    listItem.appendChild(swatch);
-    listItem.appendChild(details);
-    listItem.appendChild(actions);
-
-    list.appendChild(listItem);
+    row.appendChild(swatch);
+    row.appendChild(name);
+    row.appendChild(actions);
+    list.appendChild(row);
   });
 }
 
-function addColorOptionFromForm() {
-  var labelInput =
-    document.getElementById("colorLabelInput");
-
-  var valueInput =
-    document.getElementById("colorValueInput");
-
-  if (!labelInput || !valueInput) return;
-
-  var label =
-    (labelInput.value || "").trim();
-
-  var value =
-    (valueInput.value || "")
-      .trim()
-      .toLowerCase();
-
-  if (!label) {
-    alert("Please enter a name for this colour.");
-    labelInput.focus();
-    return;
-  }
-
-  if (!/^#[0-9a-f]{6}$/i.test(value)) {
-    alert("Please choose a valid colour.");
-    valueInput.focus();
-    return;
-  }
-
-  var isEditing = !!editingColorValue;
-
-  if (isEditing) {
-    var oldValue = editingColorValue;
-    var target =
-      findColorOptionByValue(oldValue);
-
-    if (!target) {
-      alert(
-        "The colour being edited could not be found. " +
-        "Please select it again."
-      );
-
-      resetColorEditorForm();
-      renderColorOptionsList();
-      return;
-    }
-
-    /*
-      Prevent two palette entries from having the same
-      hex value. Nodes store the hex value, so duplicates
-      would be ambiguous.
-    */
-    var duplicate = colorOptions.find(
-      function (option) {
-        return (
-          (option.value || "").toLowerCase() ===
-            value &&
-          (option.value || "").toLowerCase() !==
-            oldValue.toLowerCase()
-        );
-      }
-    );
-
-    if (duplicate) {
-      alert(
-        'That colour is already used by "' +
-        duplicate.label +
-        '". Please choose a different colour.'
-      );
-
-      valueInput.focus();
-      return;
-    }
-
-    target.label = label;
-    target.value = value;
-
-    /*
-      Update every box that used the old colour.
-    */
-    nodes.forEach(function (node) {
-      if (
-        (node.color || "").toLowerCase() ===
-        oldValue.toLowerCase()
-      ) {
-        node.color = value;
-      }
-    });
-
-    resetColorEditorForm();
-    updateAllViews();
-
-    setColorEditorStatus(
-      'Colour "' + label + '" updated.',
-      "success"
-    );
-
-    return;
-  }
-
-  /*
-    Adding a new colour.
-  */
-  var existing =
-    findColorOptionByValue(value);
-
-  if (existing) {
-    alert(
-      'That colour is already in your list as "' +
-      existing.label +
-      '". Use its Edit button to change it.'
-    );
-
-    return;
-  }
-
-  colorOptions.push({
-    label: label,
-    value: value
-  });
-
-  resetColorEditorForm();
-  updateAllViews();
-
-  setColorEditorStatus(
-    'Colour "' + label + '" added.',
-    "success"
-  );
-}
-
-// When importing CSV, we may see colour values that aren't in colorOptions yet.
-// Build default labels like "Colour 1", "Colour 2", ...
+// CSV imports can supply hex colours without names.
 function rebuildColorOptionsFromNodes() {
   var seen = {};
-  nodes.forEach(function (n) {
-    if (n.color) {
-      seen[n.color] = true;
-    }
+  nodes.forEach(function (node) {
+    if (node.color) seen[node.color.toLowerCase()] = true;
   });
-
-  colorOptions = [];
-  var index = 1;
-  for (var value in seen) {
-    if (!seen.hasOwnProperty(value)) continue;
-    colorOptions.push({
-      label: "Colour " + index,
-      value: value
-    });
-    index++;
-  }
-
+  colorOptions = Object.keys(seen).map(function (value, index) {
+    return { label: "Colour " + (index + 1), value: value };
+  });
   resetColorEditorForm();
   refreshColorSelect();
   renderColorOptionsList();
 }
-
 
 // Convert hex colour to { r, g, b }
 function hexToRgb(hex) {
@@ -1205,133 +1103,215 @@ function renderLegend() {
 
 /* ---------- Diagram rendering (boxes + connecting lines) ---------- */
 
-function computeTreeLayout(byLevel, boxH, gap, heightById) {
-  var aimNodes = byLevel.aim || [];
-  var primaryNodes = byLevel.primary || [];
-  var secondaryNodes = byLevel.secondary || [];
-  var changeNodes = byLevel.change || [];
 
-  // Build children maps in the CURRENT order of arrays (important)
-  var secondariesByPrimary = {};
-  secondaryNodes.forEach(function (s) {
-    var pid = s.parentId || "";
-    if (!secondariesByPrimary[pid]) secondariesByPrimary[pid] = [];
-    secondariesByPrimary[pid].push(s);
+/* B3.2 — Align coloured boxes by their vertical centres.
+   Reserve the full item height, including measures. */
+
+function computeTreeLayout(byLevel, boxH, gap, heightById, boxHeightById) {
+  var aims = byLevel.aim || [];
+  var primaries = byLevel.primary || [];
+  var secondaries = byLevel.secondary || [];
+  var changes = byLevel.change || [];
+
+  var secondariesByPrimary = Object.create(null);
+  var changesBySecondary = Object.create(null);
+
+  secondaries.forEach(function (n) {
+    var key = n.parentId || "";
+    (secondariesByPrimary[key] ||
+      (secondariesByPrimary[key] = [])).push(n);
   });
 
-  var changesBySecondary = {};
-  changeNodes.forEach(function (c) {
-    var sid = c.parentId || "";
-    if (!changesBySecondary[sid]) changesBySecondary[sid] = [];
-    changesBySecondary[sid].push(c);
+  changes.forEach(function (n) {
+    var key = n.parentId || "";
+    (changesBySecondary[key] ||
+      (changesBySecondary[key] = [])).push(n);
   });
 
-function nodeH(id) {
-  return (heightById && heightById[id]) ? heightById[id] : boxH;
-}
-  // Height required for a secondary branch (secondary + its changes)
-  function secondaryBranchHeight(secId) {
-    var kids = changesBySecondary[secId] || [];
-    var secBoxH = nodeH(secId);
-if (kids.length === 0) return secBoxH;
-
-var sum = 0;
-kids.forEach(function (k, i) {
-  sum += nodeH(k.id);
-  if (i < kids.length - 1) sum += gap;
-});
-return Math.max(secBoxH, sum);
+  function itemH(id) {
+    var h = Number(heightById && heightById[id]);
+    return h > 0 ? Math.max(boxH, h) : boxH;
   }
 
-  // Height required for a primary branch (primary + all its secondary branches)
-  function primaryBranchHeight(primaryId) {
-    var secs = secondariesByPrimary[primaryId] || [];
-    var pBoxH = nodeH(primaryId);
-    if (secs.length === 0) return pBoxH;
-
-    var sum = 0;
-    secs.forEach(function (sec, i) {
-      sum += secondaryBranchHeight(sec.id);
-      if (i < secs.length - 1) sum += gap; // gap between secondary groups
-    });
-
-    return Math.max(pBoxH, sum);
+  function colourH(id) {
+    var h = Number(boxHeightById && boxHeightById[id]);
+    return h > 0
+      ? Math.min(itemH(id), h)
+      : Math.min(itemH(id), boxH);
   }
 
-  // Compute overall diagram height by stacking primary branches
-  var totalHeight = 0;
-  if (primaryNodes.length === 0) {
-    totalHeight = boxH;
-  } else {
-    primaryNodes.forEach(function (p, i) {
-      totalHeight += primaryBranchHeight(p.id);
-      if (i < primaryNodes.length - 1) totalHeight += gap; // gap between primary groups
+  function shiftPositions(positions, distance) {
+    Object.keys(positions).forEach(function (id) {
+      positions[id] += distance;
     });
   }
 
-  // Positions (top offsets) per node
-  var topById = {};
+  // Lay out a secondary driver and its change ideas.
+  function secondaryBranch(sec) {
+    var children = changesBySecondary[sec.id] || [];
+    var positions = Object.create(null);
+    var y = 0;
+    var firstCentre = null;
+    var lastCentre = null;
 
-  // Place Aim in the middle of the total height (if it exists)
-  if (aimNodes.length) {
-    topById[aimNodes[0].id] = Math.max(0, (totalHeight - nodeH(aimNodes[0].id)) / 2);
+    children.forEach(function (child, index) {
+      positions[child.id] = y;
+
+      var centre = y + colourH(child.id) / 2;
+      if (index === 0) firstCentre = centre;
+      lastCentre = centre;
+
+      y += itemH(child.id);
+      if (index < children.length - 1) y += gap;
+    });
+
+    var targetCentre = children.length
+      ? (firstCentre + lastCentre) / 2
+      : colourH(sec.id) / 2;
+
+    var secTop = targetCentre - colourH(sec.id) / 2;
+
+    // Keep the whole branch within its allocated area.
+    if (secTop < 0) {
+      shiftPositions(positions, -secTop);
+      y -= secTop;
+      secTop = 0;
+    }
+
+    positions[sec.id] = secTop;
+
+    return {
+      positions: positions,
+      centre: secTop + colourH(sec.id) / 2,
+      height: Math.max(secTop + itemH(sec.id), y)
+    };
   }
 
-  // Lay out primaries, and within each primary lay out its secondaries and changes
-  var cursorY = 0;
+  // Lay out a primary driver and its secondary branches.
+  function primaryBranch(primary) {
+    var children = secondariesByPrimary[primary.id] || [];
+    var positions = Object.create(null);
+    var y = 0;
+    var firstCentre = null;
+    var lastCentre = null;
 
-  primaryNodes.forEach(function (p, pIndex) {
-    var pHeight = primaryBranchHeight(p.id);
+    children.forEach(function (sec, index) {
+      var branch = secondaryBranch(sec);
 
-    // Primary box centred within its branch block
-    topById[p.id] = cursorY + (pHeight - nodeH(p.id)) / 2;
-
-    // Secondary blocks stacked within this primary block
-    var secCursorY = cursorY;
-    var secs = secondariesByPrimary[p.id] || [];
-
-    secs.forEach(function (sec, sIndex) {
-      var secH = secondaryBranchHeight(sec.id);
-
-      // Secondary box centred within its own block
-      topById[sec.id] = secCursorY + (secH - nodeH(sec.id)) / 2;
-
-      // Change ideas stacked within the secondary block, starting at the top of the block
-      var changes = changesBySecondary[sec.id] || [];
-      var chCursorY = secCursorY;
-      changes.forEach(function (ch, chIndex) {
-        topById[ch.id] = chCursorY;
-        chCursorY += nodeH(ch.id) + gap;
+      Object.keys(branch.positions).forEach(function (id) {
+        positions[id] = y + branch.positions[id];
       });
 
-      secCursorY += secH;
-      if (sIndex < secs.length - 1) secCursorY += gap;
+      var centre = y + branch.centre;
+      if (index === 0) firstCentre = centre;
+      lastCentre = centre;
+
+      y += branch.height;
+      if (index < children.length - 1) y += gap;
     });
 
-    cursorY += pHeight;
-    if (pIndex < primaryNodes.length - 1) cursorY += gap;
-  });
+    var targetCentre = children.length
+      ? (firstCentre + lastCentre) / 2
+      : colourH(primary.id) / 2;
 
-  // Any unparented secondaries/changes (rare) — just place them at the bottom
-  // so they remain visible rather than overlapping at 0.
-  var fallbackY = totalHeight + gap;
-  secondaryNodes.forEach(function (s) {
-    if (topById[s.id] == null) {
-      topById[s.id] = fallbackY;
-      fallbackY += boxH + gap;
+    var primaryTop =
+      targetCentre - colourH(primary.id) / 2;
+
+    if (primaryTop < 0) {
+      shiftPositions(positions, -primaryTop);
+      y -= primaryTop;
+      primaryTop = 0;
     }
+
+    positions[primary.id] = primaryTop;
+
+    return {
+      positions: positions,
+      centre: primaryTop + colourH(primary.id) / 2,
+      height: Math.max(primaryTop + itemH(primary.id), y)
+    };
+  }
+
+  // Stack the primary branches.
+  var topById = Object.create(null);
+  var y = 0;
+  var firstPrimaryCentre = null;
+  var lastPrimaryCentre = null;
+
+  primaries.forEach(function (primary, index) {
+    var branch = primaryBranch(primary);
+
+    Object.keys(branch.positions).forEach(function (id) {
+      topById[id] = y + branch.positions[id];
+    });
+
+    var centre = y + branch.centre;
+    if (index === 0) firstPrimaryCentre = centre;
+    lastPrimaryCentre = centre;
+
+    y += branch.height;
+    if (index < primaries.length - 1) y += gap;
   });
-  changeNodes.forEach(function (c) {
-    if (topById[c.id] == null) {
-      topById[c.id] = fallbackY;
-      fallbackY += boxH + gap;
+
+  var totalHeight = y;
+
+  // Centre the aim against the primary driver group.
+  if (aims.length) {
+    var aim = aims[0];
+
+    var targetAimCentre = primaries.length
+      ? (firstPrimaryCentre + lastPrimaryCentre) / 2
+      : colourH(aim.id) / 2;
+
+    var aimTop =
+      targetAimCentre - colourH(aim.id) / 2;
+
+    if (aimTop < 0) {
+      shiftPositions(topById, -aimTop);
+      totalHeight -= aimTop;
+      aimTop = 0;
     }
+
+    topById[aim.id] = aimTop;
+
+    totalHeight = Math.max(
+      totalHeight,
+      aimTop + itemH(aim.id)
+    );
+  }
+
+  // Preserve visibility of unparented elements.
+  var fallbackY = totalHeight;
+
+  secondaries.forEach(function (sec) {
+    if (topById[sec.id] != null) return;
+
+    if (fallbackY > 0) fallbackY += gap;
+
+    var branch = secondaryBranch(sec);
+
+    Object.keys(branch.positions).forEach(function (id) {
+      topById[id] = fallbackY + branch.positions[id];
+    });
+
+    fallbackY += branch.height;
   });
 
-  // If we used fallback rows, extend total height
-  totalHeight = Math.max(totalHeight, fallbackY);
+  changes.forEach(function (change) {
+    if (topById[change.id] != null) return;
 
-  return { topById: topById, totalHeight: totalHeight };
+    if (fallbackY > 0) fallbackY += gap;
+
+    topById[change.id] = fallbackY;
+    fallbackY += itemH(change.id);
+  });
+
+  totalHeight = Math.max(totalHeight, fallbackY, boxH);
+
+  return {
+    topById: topById,
+    totalHeight: totalHeight
+  };
 }
 
 function estimateAutoHeightPx(text, fontSizePx, boxWidthPx, baseBoxHeightPx) {
@@ -1366,14 +1346,24 @@ function estimateMeasuresHeightPx(measures, fontSizePx) {
   return padTop + measures.length * lineH + padBottom;
 }
 
-function renderDiagram() {
-  var canvas = document.getElementById("diagramCanvas");
+
+function renderDiagram() {  var canvas = document.getElementById("diagramCanvas");
   var columnsContainer = document.getElementById("diagramColumns");
+
   var svg = document.getElementById("diagramConnections");
   if (!canvas || !columnsContainer || !svg) return;
 
+  // B3.4c: Enable more forgiving drop targets.
+  installForgivingDiagramDropZones(canvas);
+
+
 // Prevent the browser context menu anywhere inside the diagram area
+
 [canvas, columnsContainer, svg].forEach(function (el) {
+  // Register only once per persistent element.
+  if (el._diagramContextMenuGuardInstalled) return;
+  el._diagramContextMenuGuardInstalled = true;
+
   el.addEventListener("contextmenu", function (e) {
     e.preventDefault();
   });
@@ -1393,10 +1383,8 @@ function renderDiagram() {
     });
   });
 
-// --- NEW: compute a tree-style layout so branches stay aligned ---
-var boxH = (diagramAppearance && diagramAppearance.boxHeight) ? diagramAppearance.boxHeight : 32;
-var gap = (diagramAppearance && diagramAppearance.verticalGap != null) ? diagramAppearance.verticalGap : 8;
 
+// Calculate layout using the current appearance settings.
 var boxH = diagramAppearance && diagramAppearance.boxHeight ? diagramAppearance.boxHeight : 32;
 var gap = diagramAppearance && diagramAppearance.verticalGap != null ? diagramAppearance.verticalGap : 8;
 var fs  = diagramAppearance && diagramAppearance.fontSize ? diagramAppearance.fontSize : 13;
@@ -1405,6 +1393,26 @@ var fs  = diagramAppearance && diagramAppearance.fontSize ? diagramAppearance.fo
 // Use the column stack width if available; fall back to a sensible number.
 var heightById = {};
 nodes.forEach(function (n) {
+
+
+// B1.2: Give the temporary inline editor enough room.
+if (activeDiagramTextEdit &&
+    activeDiagramTextEdit.id === n.id) {
+
+  var editMeasuresFont = Math.max(10, fs - 3);
+
+  heightById[n.id] = Math.max(
+    measuredItemHeightsById[n.id] || 0,
+    128 + estimateMeasuresHeightPx(
+      n.measures,
+      editMeasuresFont
+    )
+  );
+
+  return;
+}
+
+
   // If we already measured the whole wrapper (box + measures), use that.
   if (measuredItemHeightsById && measuredItemHeightsById[n.id]) {
     heightById[n.id] = measuredItemHeightsById[n.id];
@@ -1431,7 +1439,46 @@ nodes.forEach(function (n) {
   heightById[n.id] = boxHeightForThisNode + measuresHeightForThisNode;
 });
 
-var layout = computeTreeLayout(byLevel, boxH, gap, heightById);
+
+/* B3.2 — Track the coloured box height separately
+   from the full element height (box plus measures). */
+
+var boxHeightById = {};
+
+nodes.forEach(function (n) {
+  // Reserve space for the temporary inline text editor.
+  if (activeDiagramTextEdit &&
+      activeDiagramTextEdit.id === n.id) {
+    boxHeightById[n.id] = Math.max(boxH, 128);
+    return;
+  }
+
+  // Prefer heights measured from the rendered diagram.
+  if (measuredBoxHeightsById[n.id] > 0) {
+    boxHeightById[n.id] = measuredBoxHeightsById[n.id];
+    return;
+  }
+
+  // Otherwise estimate the coloured box height.
+  boxHeightById[n.id] = n.autoSize
+    ? estimateAutoHeightPx(
+        n.text || "",
+        fs,
+        320,
+        boxH
+      )
+    : boxH;
+});
+
+// Use both complete item heights and coloured-box heights.
+var layout = computeTreeLayout(
+  byLevel,
+  boxH,
+  gap,
+  heightById,
+  boxHeightById
+);
+
 
 // Make sure the canvas is tall enough to contain absolutely-positioned nodes
 canvas.style.minHeight = Math.ceil(layout.totalHeight + gap * 2) + "px";
@@ -1537,6 +1584,49 @@ box.style.wordBreak = "break-word";
 box.style.overflowWrap = "anywhere";
 box.setAttribute("data-id", node.id);
 
+// B3.4b: Enable mouse drag-to-reorder for siblings.
+enableDiagramNodeDrag(box, node);
+
+
+/* B1.2: Select a diagram element */
+
+box.tabIndex = 0;
+box.setAttribute("role", "group");
+box.setAttribute(
+  "aria-label",
+  getLevelLabel(level) + ": " + node.text
+);
+
+if (selectedDiagramNodeId === node.id) {
+  box.classList.add("diagram-selected");
+}
+
+
+box.addEventListener("click", function (e) {
+  if (e.target.closest("button, textarea")) return;
+  selectDiagramNode(node.id);
+});
+
+// Double-click to start editing directly in the box.
+box.addEventListener("dblclick", function (e) {
+  if (e.target.closest("button, textarea")) return;
+  if (activeDiagramTextEdit) return;
+
+  e.preventDefault();
+  editNode(node.id);
+});
+
+// Keyboard support for selection and deselection.
+box.addEventListener("keydown", function (e) {
+  if (e.target !== box) return;
+
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    selectDiagramNode(node.id);
+  }
+});
+
+
 // IMPORTANT: box is no longer absolute-positioned
 box.style.position = "relative";
 
@@ -1561,11 +1651,30 @@ if (diagramAppearance) {
   box.style.fontWeight = diagramAppearance.fontBold ? "700" : "400";
 }
 
-// Apply colour fill if set
-if (node.color) {
-  box.style.backgroundColor = node.color;
+
+/* B4.2b.1 — Preserve staged colours during diagram redraws. */
+
+var displayedNodeColour = node.color || "";
+
+// While editing, use the selected preview colour
+// instead of the previously saved colour.
+if (
+  activeDiagramTextEdit &&
+  activeDiagramTextEdit.id === node.id &&
+  Object.prototype.hasOwnProperty.call(
+    activeDiagramTextEdit, "pendingColour"
+  )
+) {
+  displayedNodeColour =
+    activeDiagramTextEdit.pendingColour || "";
+}
+
+// Apply the colour currently being displayed.
+if (displayedNodeColour) {
+  box.style.backgroundColor = displayedNodeColour;
   box.style.borderColor = "#999";
-  box.style.color = getContrastingTextColor(node.color);
+  box.style.color =
+    getContrastingTextColor(displayedNodeColour);
 } else {
   box.style.backgroundColor = "#ffffff";
   box.style.borderColor = "#d0d7de";
@@ -1589,10 +1698,10 @@ if (prevLevel && level !== "primary") {
     leftBtn.style.left = -(h / 2) + "px";
   }
 
-  if (node.color) {
-    leftBtn.style.backgroundColor = node.color;
-    leftBtn.style.borderColor = node.color;
-    leftBtn.style.color = getContrastingTextColor(node.color);
+  if (displayedNodeColour) {
+  leftBtn.style.backgroundColor = displayedNodeColour;
+  leftBtn.style.borderColor = displayedNodeColour;
+  leftBtn.style.color = getContrastingTextColor(displayedNodeColour);
   } else {
     leftBtn.style.backgroundColor = "#ffffff";
     leftBtn.style.borderColor = "#d0d7de";
@@ -1624,10 +1733,10 @@ if (nextLevel) {
     rightBtn.style.right = -(h2 / 2) + "px";
   }
 
-  if (node.color) {
-    rightBtn.style.backgroundColor = node.color;
-    rightBtn.style.borderColor = node.color;
-    rightBtn.style.color = getContrastingTextColor(node.color);
+  if (displayedNodeColour) {
+  rightBtn.style.backgroundColor = displayedNodeColour;
+  rightBtn.style.borderColor = displayedNodeColour;
+  rightBtn.style.color = getContrastingTextColor(displayedNodeColour);
   } else {
     rightBtn.style.backgroundColor = "#ffffff";
     rightBtn.style.borderColor = "#d0d7de";
@@ -1646,15 +1755,204 @@ if (nextLevel) {
   box.appendChild(rightBtn);
 }
 
-// Text content
-var textSpan = document.createElement("span");
-textSpan.textContent = node.text;
-textSpan.title = "Click to edit text";
-textSpan.addEventListener("click", function (e) {
+
+// B1.3: Contextual pencil for editing selected boxes.
+var pencilBtn = document.createElement("button");
+pencilBtn.type = "button";
+pencilBtn.className = "diagram-edit-pencil";
+pencilBtn.title = "Edit text";
+pencilBtn.setAttribute(
+  "aria-label",
+  "Edit text for " + node.text
+);
+
+pencilBtn.innerHTML =
+  '<svg viewBox="0 0 24 24" width="15" height="15" ' +
+  'fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" ' +
+  'aria-hidden="true" focusable="false">' +
+  '<path d="M12 20h9"/>' +
+  '<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3' +
+  'L7 19l-4 1 1-4Z"/>' +
+  '</svg>';
+
+pencilBtn.addEventListener("click", function (e) {
   e.stopPropagation();
   editNode(node.id);
 });
-box.appendChild(textSpan);
+
+
+box.appendChild(pencilBtn);
+
+// B4.2c: Contextual delete button for the selected element.
+var deleteBtn = document.createElement("button");
+deleteBtn.type = "button";
+deleteBtn.className = "diagram-delete-button";
+deleteBtn.title = "Delete element";
+deleteBtn.setAttribute(
+  "aria-label",
+  "Delete " + getLevelLabel(node.level) + ": " + node.text
+);
+
+deleteBtn.innerHTML =
+  '<svg viewBox="0 0 24 24" width="15" height="15" ' +
+  'fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" ' +
+  'aria-hidden="true" focusable="false">' +
+  '<path d="M3 6h18"/>' +
+  '<path d="M8 6V4h8v2"/>' +
+  '<path d="M19 6l-1 14H6L5 6"/>' +
+  '<path d="M10 10v7M14 10v7"/>' +
+  '</svg>';
+
+deleteBtn.addEventListener("click", function (event) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  // Never delete a box while text editing is in progress.
+  if (activeDiagramTextEdit) return;
+
+  // Reuse the existing confirmation and dependent-item cleanup.
+  deleteNode(node.id);
+});
+
+box.appendChild(deleteBtn);
+
+
+/* B1.2: Display text or an inline editor */
+
+if (activeDiagramTextEdit &&
+    activeDiagramTextEdit.id === node.id) {
+
+  box.classList.add("diagram-text-editing");
+  box.style.height = "auto";
+
+  var inlineInput = document.createElement("textarea");
+  inlineInput.id = "diagramInlineText";
+  inlineInput.className = "diagram-inline-text";
+  inlineInput.rows = 3;
+  inlineInput.value = activeDiagramTextEdit.draft;
+
+  if (activeDiagramTextEdit.isNew) {
+    inlineInput.placeholder =
+      "Enter " + getLevelLabel(node.level) + " text";
+  }
+
+  inlineInput.setAttribute(
+    "aria-label",
+    "Edit " + getLevelLabel(node.level) + " text"
+  );
+
+  inlineInput.addEventListener("click", function (e) {
+    e.stopPropagation();
+  });
+
+  inlineInput.addEventListener("input", function () {
+    activeDiagramTextEdit.draft = inlineInput.value;
+
+    var inlineFeedback = document.getElementById(
+      "diagramInlineTextFeedback"
+    );
+
+    if (inlineFeedback) {
+      inlineFeedback.textContent = "";
+    }
+
+    document.getElementById(
+      "diagramEditFeedback"
+    ).textContent =
+      "Editing inside the box. Ctrl+Enter to save; Escape to cancel.";
+  });
+
+  inlineInput.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelDiagramInlineText();
+    } else if (
+      e.key === "Enter" && (e.ctrlKey || e.metaKey)
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      saveDiagramInlineText();
+    }
+  });
+
+
+  // B3.4a: Keep Save and Cancel inside the edited box.
+  var inlineEditor = document.createElement("div");
+  inlineEditor.className = "diagram-inline-editor";
+
+  var inlineActions = document.createElement("div");
+  inlineActions.className = "diagram-inline-actions";
+
+  var inlineSave = document.createElement("button");
+  inlineSave.type = "button";
+  inlineSave.className = "diagram-inline-save";
+  inlineSave.textContent = "✓";
+  inlineSave.title = "Save text (Ctrl+Enter)";
+  inlineSave.setAttribute("aria-label", "Save text changes");
+
+  inlineSave.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    saveDiagramInlineText();
+  });
+
+  var inlineCancel = document.createElement("button");
+  inlineCancel.type = "button";
+  inlineCancel.className = "diagram-inline-cancel";
+  inlineCancel.textContent = "×";
+  inlineCancel.title = "Cancel editing (Escape)";
+  inlineCancel.setAttribute("aria-label", "Cancel text changes");
+
+  inlineCancel.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    cancelDiagramInlineText();
+  });
+
+  var inlineFeedback = document.createElement("span");
+  inlineFeedback.id = "diagramInlineTextFeedback";
+  inlineFeedback.className = "diagram-inline-feedback";
+  inlineFeedback.setAttribute("role", "status");
+
+
+  // B4.2b — Colour picker at the bottom-left of the editor.
+  var inlineColourButton = document.createElement("button");
+  inlineColourButton.type = "button";
+  inlineColourButton.className = "diagram-inline-colour-button";
+  inlineColourButton.textContent = "🎨";
+  inlineColourButton.title = "Change box colour";
+  inlineColourButton.setAttribute(
+    "aria-label", "Choose box colour"
+  );
+  inlineColourButton.setAttribute("aria-haspopup", "true");
+
+  inlineColourButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    showInlineColourMenu(node.id, inlineColourButton);
+  });
+
+  inlineActions.appendChild(inlineColourButton);
+  inlineActions.appendChild(inlineSave);
+  inlineActions.appendChild(inlineCancel);
+
+  inlineEditor.appendChild(inlineInput);
+  inlineEditor.appendChild(inlineActions);
+  inlineEditor.appendChild(inlineFeedback);
+
+  box.appendChild(inlineEditor);
+
+} else {
+
+  var textSpan = document.createElement("span");
+  textSpan.className = "diagram-node-text";
+  textSpan.textContent = node.text;
+  box.appendChild(textSpan);
+
+}
 
 // Put the coloured box into the wrapper
 item.appendChild(box);
@@ -1669,30 +1967,178 @@ if (node.measures && node.measures.length) {
   measuresWrap.style.color = "#111";
   measuresWrap.style.background = "transparent";
 
-  node.measures.forEach(function (m) {
-    var row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.gap = "6px";
-    row.style.alignItems = "flex-start";
+  
+node.measures.forEach(function (m, measureIndex) {
+  var row = document.createElement("div");
 
-    var meta = getMeasureTypeMeta((m && m.type) || "");
+  row.className = "diagram-measure-row";
+  row.dataset.nodeId = node.id;
+  row.dataset.measureIndex = String(measureIndex);
+  row.tabIndex = 0;
+  row.setAttribute("role", "button");
 
-    var icon = document.createElement("span");
-    icon.textContent = meta.icon;
-    icon.style.marginTop = "1px";
-    icon.style.color = meta.color;
-    icon.title = meta.label;
+  var meta = getMeasureTypeMeta((m && m.type) || "");
+  var measureText = (m && m.text) ? m.text : "";
 
-    var txt = document.createElement("span");
-    txt.textContent = (m && m.text) ? m.text : "";
+  row.setAttribute(
+    "aria-label",
+    meta.label + ": " + measureText
+  );
 
-    row.appendChild(icon);
-    row.appendChild(txt);
-    measuresWrap.appendChild(row);
+  var isSelected = !!selectedDiagramMeasure &&
+    selectedDiagramMeasure.nodeId === node.id &&
+    selectedDiagramMeasure.index === measureIndex;
+
+  row.setAttribute(
+    "aria-pressed",
+    isSelected ? "true" : "false"
+  );
+
+  if (isSelected) {
+    row.classList.add("diagram-measure-selected");
+  }
+
+  row.style.display = "flex";
+  row.style.gap = "6px";
+  row.style.alignItems = "flex-start";
+
+  var icon = document.createElement("span");
+  icon.textContent = meta.icon;
+  icon.style.marginTop = "1px";
+  icon.style.color = meta.color;
+  icon.title = meta.label;
+
+  var txt = document.createElement("span");
+  txt.textContent = measureText;
+
+  row.appendChild(icon);
+  row.appendChild(txt);
+
+  // Single click: select or deselect.
+  row.addEventListener("click", function (e) {
+    e.stopPropagation();
+    closeMeasureContextMenu();
+    selectDiagramMeasure(node.id, measureIndex, true);
   });
+
+  // Double-click: edit the specific measure.
+  row.addEventListener("dblclick", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (activeDiagramTextEdit) return;
+
+    selectDiagramMeasure(node.id, measureIndex, false);
+    editMeasureOnNode(node.id, measureIndex);
+  });
+
+  // Right-click: measure-specific actions.
+  row.addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (activeDiagramTextEdit) return;
+
+    selectDiagramMeasure(node.id, measureIndex, false);
+
+    openMeasureContextMenu(
+      node.id, measureIndex, e.clientX, e.clientY
+    );
+  });
+
+  // Keyboard alternatives.
+  row.addEventListener("keydown", function (e) {
+    if (e.key === " ") {
+      e.preventDefault();
+      selectDiagramMeasure(node.id, measureIndex, true);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      selectDiagramMeasure(node.id, measureIndex, false);
+      editMeasureOnNode(node.id, measureIndex);
+    } else if (
+      e.key === "ContextMenu" ||
+      (e.shiftKey && e.key === "F10")
+    ) {
+      e.preventDefault();
+
+      selectDiagramMeasure(node.id, measureIndex, false);
+
+      var bounds = row.getBoundingClientRect();
+
+      openMeasureContextMenu(
+        node.id, measureIndex, bounds.left, bounds.bottom
+      );
+    }
+  });
+
+  measuresWrap.appendChild(row);
+});
+
+// B4.2d — Enable dragging within this element's measure list.
+enableMeasureReordering(measuresWrap, node);
 
   item.appendChild(measuresWrap);
 }
+
+
+/* B2.3 — Contextual Add measure button */
+
+item.classList.toggle(
+  "diagram-no-measures",
+  !node.measures || node.measures.length === 0
+);
+
+var quickAddMeasure = document.createElement("button");
+quickAddMeasure.type = "button";
+quickAddMeasure.className = "diagram-quick-add-measure";
+quickAddMeasure.title = "Add measure";
+
+quickAddMeasure.setAttribute(
+  "aria-label",
+  "Add measure to " + node.text
+);
+
+
+var measureIcon = document.createElement("span");
+measureIcon.className = "quick-add-measure-icon";
+measureIcon.setAttribute("aria-hidden", "true");
+
+measureIcon.innerHTML =
+  '<svg viewBox="0 0 20 20" width="15" height="15" ' +
+  'fill="none" stroke="currentColor" stroke-width="1.8" ' +
+  'stroke-linecap="round" stroke-linejoin="round" ' +
+  'focusable="false">' +
+  '<path d="M3 16V10M8 16V5M13 16V8M18 16V3"/>' +
+  '<path d="M2 17h17"/>' +
+  '</svg>';
+
+var caption = document.createElement("span");
+caption.className = "quick-add-measure-label";
+caption.textContent = "Add measure";
+
+quickAddMeasure.appendChild(measureIcon);
+quickAddMeasure.appendChild(caption);
+
+quickAddMeasure.addEventListener("click", function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  // Never interrupt unfinished editing.
+  if (
+    activeDiagramTextEdit ||
+    document.querySelector(
+      "dialog[open], .diagram-measure-editor-overlay"
+    )
+  ) {
+    return;
+  }
+
+  // Reuse the existing, tested Add measure editor.
+  addMeasureToNode(node.id);
+});
+
+item.appendChild(quickAddMeasure);
+
 
 // Finally add the wrapper to the stack
 stack.appendChild(item);
@@ -1704,8 +2150,8 @@ stack.appendChild(item);
   // Draw connecting lines after layout has happened
 if (!window.requestAnimationFrame) {
   drawConnections(canvas, svg);
-} else {
-  window.requestAnimationFrame(function () {
+} else {  
+window.requestAnimationFrame(function () {
     // Measure actual auto-sized node heights and re-layout once if needed
     if (!suppressAutosizeRelayout) {
       var changed = false;
@@ -1755,13 +2201,196 @@ if (!window.requestAnimationFrame) {
       }
     }
 
-    // If no re-layout needed, just draw the connections
-    drawConnections(canvas, svg);
-  });
+    // If no re-layout is needed, draw the connections.
+    drawConnections(canvas, svg);  });
 }
 }
 
+
+
+
+/* B3.3: Individual connection selection */
+
+var selectedDiagramConnection = null;
+
+function normaliseConnectionOverride(value) {
+  return (
+    value === "straight" ||
+    value === "orthogonal" ||
+    value === "bezier"
+  ) ? value : "";
+}
+
+function findDiagramConnection(fromId, toId) {
+  return connections.find(function (c) {
+    return c.fromId === fromId && c.toId === toId;
+  });
+}
+
+function updateDiagramConnectionBar() {
+  var bar = document.getElementById("connectionFormatBar");
+  if (!bar) return;
+
+  var selected = selectedDiagramConnection;
+  var connection = selected && findDiagramConnection(
+    selected.fromId, selected.toId
+  );
+
+  if (!connection) {
+    selectedDiagramConnection = null;
+    bar.hidden = true;
+    return;
+  }
+
+  var from = nodes.find(function (n) {
+    return n.id === connection.fromId;
+  });
+
+  var to = nodes.find(function (n) {
+    return n.id === connection.toId;
+  });
+
+  if (!from || !to) {
+    selectedDiagramConnection = null;
+    bar.hidden = true;
+    return;
+  }
+
+
+  bar.hidden = false;
+
+  var label = document.getElementById(
+    "connectionFormatLabel"
+  );
+
+  label.textContent = from.text + " → " + to.text;
+  label.title = label.textContent;
+
+  var currentStyle =
+    normaliseConnectionOverride(connection.style) ||
+    "default";
+
+  document.getElementById(
+    "connectionFormatSelect"
+  ).value = currentStyle;
+
+  bar.querySelectorAll(
+    "[data-connection-style]"
+  ).forEach(function (button) {
+
+    var active =
+      button.getAttribute("data-connection-style") ===
+      currentStyle;
+
+    button.classList.toggle("is-active", active);
+    button.setAttribute(
+      "aria-pressed",
+      active ? "true" : "false"
+    );
+  });
+}
+
+function clearDiagramConnectionSelection() {
+  if (!selectedDiagramConnection) return;
+
+  selectedDiagramConnection = null;
+  updateDiagramConnectionBar();
+
+  var canvas = document.getElementById("diagramCanvas");
+  var svg = document.getElementById("diagramConnections");
+
+  if (canvas && svg) {
+    drawConnections(canvas, svg);
+  }
+}
+
+
+function positionConnectionFormatBar(clientX, clientY) {
+  var bar = document.getElementById("connectionFormatBar");
+  if (!bar || bar.hidden) return;
+
+  var rect = bar.getBoundingClientRect();
+
+  var x = Number.isFinite(clientX) ? clientX : 20;
+  var y = Number.isFinite(clientY) ? clientY : 20;
+
+  // Prefer positioning to the right of the click.
+  var left = x + 12;
+
+  if (left + rect.width > window.innerWidth - 8) {
+    left = x - rect.width - 12;
+  }
+
+  left = Math.max(
+    8,
+    Math.min(left, window.innerWidth - rect.width - 8)
+  );
+
+  // Prefer below the click, but move above if needed.
+  var top = y + 12;
+
+  if (top + rect.height > window.innerHeight - 8) {
+    top = y - rect.height - 12;
+  }
+
+  top = Math.max(
+    8,
+    Math.min(top, window.innerHeight - rect.height - 8)
+  );
+
+  bar.style.left = left + "px";
+  bar.style.top = top + "px";
+}
+
+function selectDiagramConnection(
+  fromId, toId, clientX, clientY
+) {
+
+  if (
+    activeDiagramTextEdit ||
+    document.querySelector(
+      "dialog[open], .diagram-measure-editor-overlay"
+    )
+  ) return;
+
+  if (!findDiagramConnection(fromId, toId)) return;
+
+  var same = selectedDiagramConnection &&
+    selectedDiagramConnection.fromId === fromId &&
+    selectedDiagramConnection.toId === toId;
+
+  selectedDiagramConnection = same ? null : {
+    fromId: fromId,
+    toId: toId
+  };
+
+  selectedDiagramNodeId = null;
+  clearSelectedDiagramMeasure();
+  closeMeasureContextMenu();
+  closeNodeContextMenu();
+
+  document.querySelectorAll(
+    ".diagram-node.diagram-selected"
+  ).forEach(function (box) {
+    box.classList.remove("diagram-selected");
+  });
+
+  updateDiagramSelectionBar();
+  updateDiagramConnectionBar();
+
+  if (selectedDiagramConnection) {
+    positionConnectionFormatBar(clientX, clientY);
+  }
+
+  var canvas = document.getElementById("diagramCanvas");  var svg = document.getElementById("diagramConnections");
+
+  if (canvas && svg) {
+    drawConnections(canvas, svg);
+  }
+}
+
 function drawConnections(canvas, svg) {
+
   var canvasRect = canvas.getBoundingClientRect();
 
   // Clear previous lines
@@ -1799,31 +2428,141 @@ function drawConnections(canvas, svg) {
     var midX = (x1 + x2) / 2;
 
     var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    var d =
-      "M " +
-      x1 +
-      " " +
-      y1 +
-      " C " +
-      midX +
-      " " +
-      y1 +
-      ", " +
-      midX +
-      " " +
-      y2 +
-      ", " +
-      x2 +
-      " " +
-      y2;
+    
+// B2.5: Draw the selected connection style.
+var connectionStyle = normaliseConnectionOverride(conn.style) ||
+  normaliseConnectionStyle(diagramAppearance.connectionStyle);
 
+var d;
+
+if (connectionStyle === "straight") {
+
+  // Direct line between the two boxes.
+  d = "M " + x1 + " " + y1 +
+      " L " + x2 + " " + y2;
+
+} else if (connectionStyle === "orthogonal") {
+
+  // Horizontal, vertical, horizontal.
+  // The bends occur halfway between columns.
+  d = "M " + x1 + " " + y1 +
+      " H " + midX +
+      " V " + y2 +
+      " H " + x2;
+
+} else {
+
+  // Original smooth cubic Bézier connection.
+  d = "M " + x1 + " " + y1 +
+      " C " + midX + " " + y1 +
+      ", " + midX + " " + y2 +
+      ", " + x2 + " " + y2;
+
+}
+
+
+    
+    var selected = !!selectedDiagramConnection &&
+      selectedDiagramConnection.fromId === conn.fromId &&
+      selectedDiagramConnection.toId === conn.toId;
+
+    path.setAttribute("class", "diagram-connection-visible");
     path.setAttribute("d", d);
     path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "#666");
-    path.setAttribute("stroke-width", "2.5");
+    path.setAttribute(
+      "stroke",
+      selected ? "#005eb8" : "#666"
+    );
+    path.setAttribute(
+      "stroke-width",
+      selected ? "3.5" : "2.5"
+    );
     path.setAttribute("stroke-linecap", "round");
+    path.setAttribute(
+      "data-selected",
+      selected ? "true" : "false"
+    );
 
     svg.appendChild(path);
+
+    // A wider invisible path makes selecting easier.
+    var hit = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "path"
+    );
+
+    hit.setAttribute("class", "diagram-connection-hit");
+    hit.setAttribute("d", d);
+    hit.setAttribute("fill", "none");
+    hit.setAttribute("stroke", "transparent");
+    hit.setAttribute("stroke-width", "16");
+    hit.setAttribute("pointer-events", "stroke");
+    hit.setAttribute("tabindex", "0");
+    hit.setAttribute("role", "button");
+
+    hit.setAttribute(
+      "aria-pressed",
+      selected ? "true" : "false"
+    );
+
+    var fromNode = nodes.find(function (n) {
+      return n.id === conn.fromId;
+    });
+
+    var toNode = nodes.find(function (n) {
+      return n.id === conn.toId;
+    });
+
+    hit.setAttribute(
+      "aria-label",
+      "Select connection from " +
+      (fromNode ? fromNode.text : conn.fromId) +
+      " to " +
+      (toNode ? toNode.text : conn.toId)
+    );
+
+        hit.addEventListener("click", function (event) {
+      event.stopPropagation();
+
+      selectDiagramConnection(
+        conn.fromId,
+        conn.toId,
+        event.clientX,
+        event.clientY
+      );
+    });
+
+    hit.addEventListener("keydown", function (event) {
+      if (
+        event.key !== "Enter" &&
+        event.key !== " "
+      ) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      
+      var bounds = hit.getBoundingClientRect();
+
+      selectDiagramConnection(
+        conn.fromId,
+        conn.toId,
+        bounds.left + bounds.width / 2,
+        bounds.top + bounds.height / 2
+      );
+
+      var firstChoice = document.querySelector(
+        "#connectionFormatBar [data-connection-style]"
+      );
+
+      if (firstChoice && selectedDiagramConnection) {
+        firstChoice.focus();
+      }
+
+    });
+
+    svg.appendChild(hit);
+
   });
 
 }
@@ -1901,7 +2640,347 @@ function createColorSelectForNode(node) {
   return select;
 }
 
+
+/* B3.4b: Drag sibling nodes without changing their relationships. */
+
+var diagramDraggingNodeId = null;
+var diagramDragTargetBox = null;
+
+function clearDiagramDragMarker() {
+  if (diagramDragTargetBox) {
+    diagramDragTargetBox.classList.remove(
+      "diagram-drop-before", "diagram-drop-after"
+    );
+    diagramDragTargetBox = null;
+  }
+
+  document.querySelectorAll(".diagram-dragging").forEach(
+    function (box) {
+      box.classList.remove("diagram-dragging");
+    }
+  );
+}
+
+function reorderDiagramSibling(fromId, toId, placeAfter) {
+  var source = nodes.find(function (n) {
+    return n.id === fromId;
+  });
+
+  var target = nodes.find(function (n) {
+    return n.id === toId;
+  });
+
+  if (!source || !target || source.id === target.id ||
+      source.level !== target.level ||
+      (source.parentId || "") !== (target.parentId || "")) {
+    return;
+  }
+
+  var slots = [];
+  var group = [];
+
+  nodes.forEach(function (n, index) {
+    if (n.level === source.level &&
+        (n.parentId || "") === (source.parentId || "")) {
+      slots.push(index);
+      group.push(n);
+    }
+  });
+
+  var before = group.map(function (n) {
+    return n.id;
+  }).join("|");
+
+  var fromIndex = group.findIndex(function (n) {
+    return n.id === fromId;
+  });
+
+  if (fromIndex < 0) return;
+
+  var moved = group.splice(fromIndex, 1)[0];
+
+  var targetIndex = group.findIndex(function (n) {
+    return n.id === toId;
+  });
+
+  if (targetIndex < 0) return;
+
+  group.splice(
+    targetIndex + (placeAfter ? 1 : 0),
+    0,
+    moved
+  );
+
+  if (group.map(function (n) {
+    return n.id;
+  }).join("|") === before) return;
+
+  slots.forEach(function (slot, index) {
+    nodes[slot] = group[index];
+  });
+
+  // One completed drag creates one Undo history entry.
+  updateAllViews();
+}
+
+
+/* B3.4c — Accept drops in gaps, while keeping parent groups separate. */
+
+function installForgivingDiagramDropZones(canvas) {
+  if (canvas._forgivingDropsInstalled) return;
+  canvas._forgivingDropsInstalled = true;
+
+  function findDropPosition(event) {
+    var source = nodes.find(function (n) {
+      return n.id === diagramDraggingNodeId;
+    });
+    if (!source) return null;
+
+    var levelIndex = levelOrder.indexOf(source.level);
+    var columns = document.querySelectorAll(
+      "#diagramColumns .diagram-column"
+    );
+    var column = columns[levelIndex];
+    if (!column) return null;
+
+    // Accept the column plus a small margin on either side.
+    var area = column.getBoundingClientRect();
+
+    if (event.clientX < area.left - 16 ||
+        event.clientX > area.right + 16) {
+      return null;
+    }
+
+    var closest = null;
+    var smallestDistance = Infinity;
+
+    column.querySelectorAll(
+      ".diagram-column-stack > .diagram-item"
+    ).forEach(function (item) {
+      var id = item.getAttribute("data-id");
+
+      var candidate = nodes.find(function (n) {
+        return n.id === id;
+      });
+      if (!candidate) return;
+
+      var rect = item.getBoundingClientRect();
+
+      var distance = Math.max(
+        rect.top - event.clientY,
+        0,
+        event.clientY - rect.bottom
+      );
+
+      if (distance < smallestDistance) {
+        smallestDistance = distance;
+        closest = {
+          node: candidate,
+          item: item
+        };
+      }
+    });
+
+    // Never mix elements belonging to different parents.
+    if (!closest ||
+        closest.node.level !== source.level ||
+        (closest.node.parentId || "") !==
+        (source.parentId || "")) {
+      return null;
+    }
+
+    var box = closest.item.querySelector(".diagram-node");
+    if (!box) return null;
+
+    var boxRect = box.getBoundingClientRect();
+
+    return {
+      id: closest.node.id,
+      box: box,
+      after: event.clientY >=
+        boxRect.top + boxRect.height / 2
+    };
+  }
+
+  function clearDropHighlight() {
+    if (diagramDragTargetBox) {
+      diagramDragTargetBox.classList.remove(
+        "diagram-drop-before",
+        "diagram-drop-after"
+      );
+      diagramDragTargetBox = null;
+    }
+  }
+
+  function handleDragging(event) {
+    if (!diagramDraggingNodeId) return;
+
+    // Handle drag events before the older box-only handlers.
+    event.stopPropagation();
+
+    var target = findDropPosition(event);
+
+    if (!target) {
+      clearDropHighlight();
+      return;
+    }
+
+    // Tell the browser this is a valid drop location.
+    event.preventDefault();
+
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+
+    if (target.id === diagramDraggingNodeId) {
+      clearDropHighlight();
+      return;
+    }
+
+    if (diagramDragTargetBox !== target.box) {
+      clearDropHighlight();
+    }
+
+    diagramDragTargetBox = target.box;
+
+    target.box.classList.toggle(
+      "diagram-drop-before",
+      !target.after
+    );
+
+    target.box.classList.toggle(
+      "diagram-drop-after",
+      target.after
+    );
+  }
+
+  canvas.addEventListener(
+    "dragenter", handleDragging, true
+  );
+
+  canvas.addEventListener(
+    "dragover", handleDragging, true
+  );
+
+  canvas.addEventListener("drop", function (event) {
+    if (!diagramDraggingNodeId) return;
+
+    event.stopPropagation();
+
+    var target = findDropPosition(event);
+
+    if (!target) {
+      clearDropHighlight();
+      return;
+    }
+
+    event.preventDefault();
+
+    var fromId = diagramDraggingNodeId;
+    diagramDraggingNodeId = null;
+
+    clearDiagramDragMarker();
+
+    if (target.id !== fromId) {
+      reorderDiagramSibling(
+        fromId,
+        target.id,
+        target.after
+      );
+    }
+  }, true);
+}
+
+function enableDiagramNodeDrag(box, node) {
+
+  if (node.level === "aim" ||
+      getSiblingIdsInOrder(node).length < 2) {
+    return;
+  }
+
+  box.draggable = true;
+
+  box.addEventListener("dragstart", function (event) {
+    if (
+      activeDiagramTextEdit ||
+      (event.target.closest &&
+       event.target.closest("button, textarea, input, select"))
+    ) {
+      event.preventDefault();
+      return;
+    }
+
+    diagramDraggingNodeId = node.id;
+    box.classList.add("diagram-dragging");
+
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", node.id);
+    }
+  });
+
+  box.addEventListener("dragover", function (event) {
+    var source = nodes.find(function (n) {
+      return n.id === diagramDraggingNodeId;
+    });
+
+    if (!source ||
+        source.id === node.id ||
+        source.level !== node.level ||
+        (source.parentId || "") !== (node.parentId || "")) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+
+    if (diagramDragTargetBox &&
+        diagramDragTargetBox !== box) {
+      diagramDragTargetBox.classList.remove(
+        "diagram-drop-before", "diagram-drop-after"
+      );
+    }
+
+    diagramDragTargetBox = box;
+
+    var rect = box.getBoundingClientRect();
+    var after = event.clientY > rect.top + rect.height / 2;
+
+    box.classList.toggle("diagram-drop-after", after);
+    box.classList.toggle("diagram-drop-before", !after);
+  });
+
+  box.addEventListener("drop", function (event) {
+    if (!diagramDraggingNodeId ||
+        diagramDragTargetBox !== box) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    var fromId = diagramDraggingNodeId;
+    var after = box.classList.contains(
+      "diagram-drop-after"
+    );
+
+    diagramDraggingNodeId = null;
+    clearDiagramDragMarker();
+
+    reorderDiagramSibling(fromId, node.id, after);
+  });
+
+  box.addEventListener("dragend", function () {
+    diagramDraggingNodeId = null;
+    clearDiagramDragMarker();
+  });
+}
+
 // --- Manual reordering helpers (reorders within same parentId + same level) ---
+
 function getSiblingIdsInOrder(node) {
   var pid = node.parentId || "";
   var lvl = node.level;
@@ -1986,32 +3065,28 @@ function insertAfterLastSibling(nodes, newNode) {
 
 function setupCollapsibleSections() {
   var panel = document.getElementById("controlsPanel");
-  if (!panel) return;
-
-  // prevent double-binding if called more than once
-  if (panel._collapsibleBound) return;
+  if (!panel || panel._collapsibleBound) return;
   panel._collapsibleBound = true;
 
-  panel.addEventListener("click", function (e) {
-    var el = e.target;
+  // Native buttons support Enter, Space and screen readers.
+  panel.querySelectorAll("button.collapsible-header[data-target]")
+    .forEach(function (button) {
+      var section = document.getElementById(button.dataset.target);
+      if (!section) return;
 
-    // Walk up the DOM until we hit a collapsible header or the panel
-    while (el && el !== panel) {
-      if (el.classList && el.classList.contains("collapsible-header")) break;
-      el = el.parentNode;
-    }
-    if (!el || el === panel) return;
+      function syncState() {
+        var collapsed = section.classList.contains("is-collapsed");
+        button.setAttribute("aria-expanded", String(!collapsed));
+        var indicator = button.querySelector(".collapsible-indicator");
+        if (indicator) indicator.textContent = collapsed ? "▸" : "▾";
+      }
 
-    var targetId = el.getAttribute("data-target");
-    if (!targetId) return;
-
-    var section = document.getElementById(targetId);
-    if (!section) return;
-
-    var indicator = el.querySelector(".collapsible-indicator");
-    var collapsed = section.classList.toggle("is-collapsed");
-    if (indicator) indicator.textContent = collapsed ? "▸" : "▾";
-  });
+      syncState();
+      button.addEventListener("click", function () {
+        section.classList.toggle("is-collapsed");
+        syncState();
+      });
+    });
 }
 
 function applyDiagramAppearanceFromInputs() {
@@ -2039,6 +3114,12 @@ function applyDiagramAppearanceFromInputs() {
   diagramAppearance.fontFamily = ff;
   diagramAppearance.fontBold = bold; 
 
+var lineInput = document.getElementById("connectionStyleInput");
+if (lineInput) {
+  diagramAppearance.connectionStyle =
+    normaliseConnectionStyle(lineInput.value);
+}
+
   updateAllViews();
 }
 
@@ -2056,16 +3137,186 @@ function setAppearanceInputsFromConfig() {
   fsInput.value = diagramAppearance.fontSize;
   ffInput.value = diagramAppearance.fontFamily || "";
   boldInput.checked = !!diagramAppearance.fontBold;
+var lineInput = document.getElementById("connectionStyleInput");
+if (lineInput) {
+  lineInput.value = normaliseConnectionStyle(
+    diagramAppearance.connectionStyle
+  );
+}
 }
 
 
+/* B3.1 — In-memory diagram undo/redo */
+
+var diagramHistoryStates = [];
+var diagramHistoryIndex = -1;
+var diagramHistoryReady = false;
+var diagramHistoryRestoring = false;
+var DIAGRAM_HISTORY_LIMIT = 51; // Current state + up to 50 changes.
+
+function captureDiagramHistoryState() {
+  return JSON.stringify({
+    nodes: nodes,
+    nextId: nextId,
+    connections: connections,
+    colorOptions: colorOptions,
+    columnTitles: columnTitles,
+    diagramAppearance: diagramAppearance,
+    legendVisible: legendVisible
+  });
+}
+
+function refreshDiagramHistoryButtons() {
+  var undoBtn = document.getElementById("btnDiagramUndo");
+  var redoBtn = document.getElementById("btnDiagramRedo");
+
+  if (undoBtn) {
+    undoBtn.disabled =
+      !diagramHistoryReady || diagramHistoryIndex <= 0;
+  }
+
+  if (redoBtn) {
+    redoBtn.disabled =
+      !diagramHistoryReady ||
+      diagramHistoryIndex >= diagramHistoryStates.length - 1;
+  }
+}
+
+function initialiseDiagramHistory() {
+  diagramHistoryStates = [captureDiagramHistoryState()];
+  diagramHistoryIndex = 0;
+  diagramHistoryReady = true;
+  refreshDiagramHistoryButtons();
+}
+
+function recordDiagramHistory() {
+  if (!diagramHistoryReady || diagramHistoryRestoring) return;
+
+  // New boxes are drafts until confirmed with the tick.
+  if (activeDiagramTextEdit &&
+      activeDiagramTextEdit.isNew) return;
+  var snapshot = captureDiagramHistoryState();
+
+  // Ignore redraws and actions that did not change the diagram.
+  if (snapshot === diagramHistoryStates[diagramHistoryIndex]) {
+    return;
+  }
+
+  // A new edit after Undo discards the old Redo branch.
+  diagramHistoryStates =
+    diagramHistoryStates.slice(0, diagramHistoryIndex + 1);
+
+  diagramHistoryStates.push(snapshot);
+
+  if (diagramHistoryStates.length > DIAGRAM_HISTORY_LIMIT) {
+    diagramHistoryStates.shift();
+  }
+
+  diagramHistoryIndex = diagramHistoryStates.length - 1;
+  refreshDiagramHistoryButtons();
+}
+
+function canRestoreDiagramHistory() {
+  // Never lose unfinished text or modal edits.
+  if (activeDiagramTextEdit || activeOutlineTextEdit) {
+    return false;
+  }
+  if (document.querySelector(
+    "dialog[open], .diagram-measure-editor-overlay"
+  )) return false;
+
+  if (document.querySelector("#helpOverlay.is-open")) {
+    return false;
+  }
+
+  if (editingColorValue && isColorEditorDirty()) {
+    return false;
+  }
+
+  return true;
+}
+
+function restoreDiagramHistory(index) {
+  if (!diagramHistoryReady ||
+      index < 0 ||
+      index >= diagramHistoryStates.length ||
+      !canRestoreDiagramHistory()) {
+    return;
+  }
+
+  diagramHistoryRestoring = true;
+
+  try {
+    var state = JSON.parse(diagramHistoryStates[index]);
+
+    nodes = state.nodes;
+    nextId = state.nextId;
+    connections = state.connections;
+    colorOptions = state.colorOptions;
+    columnTitles = state.columnTitles;
+    diagramAppearance = state.diagramAppearance;
+    legendVisible = state.legendVisible;
+
+    // Clear selections that may no longer be valid.
+    selectedDiagramNodeId = null;
+    selectedDiagramMeasure = null;
+    activeDiagramTextEdit = null;
+    selectedDiagramConnection = null;
+
+    closeNodeContextMenu();
+    closeMeasureContextMenu();
+
+    // Recalculate all dimensions after restoring.
+    measuredBoxHeightsById = {};
+    measuredItemHeightsById = {};
+    suppressAutosizeRelayout = false;
+
+    resetColorEditorForm();
+    setAppearanceInputsFromConfig();
+    updateAllViews();
+
+    diagramHistoryIndex = index;
+
+  } finally {
+    diagramHistoryRestoring = false;
+    refreshDiagramHistoryButtons();
+  }
+}
+
+function undoDiagramChange() {
+  if (diagramHistoryIndex > 0) {
+    restoreDiagramHistory(diagramHistoryIndex - 1);
+  }
+}
+
+function redoDiagramChange() {
+  if (diagramHistoryIndex < diagramHistoryStates.length - 1) {
+    restoreDiagramHistory(diagramHistoryIndex + 1);
+  }
+}
+
+
+
+
 function updateAllViews() {
+  // B3.1: Record changes, but ignore unchanged redraws.
+  recordDiagramHistory();
+
   refreshParentOptions();
-  renderDiagram();
+
+  if (diagramViewMode === "outline") {
+    renderDiagramOutline();
+  } else {
+    renderDiagram();
+  }
+
   refreshColorSelect();
   renderColorOptionsList();
   renderLegend();
   updateLegendVisibility();
+  updateDiagramSelectionBar();
+  updateDiagramConnectionBar();
+
 }
 
 /* ---------- Actions from the form ---------- */
@@ -2113,24 +3364,314 @@ if (parentId) {
 
 /* ---------- Edit existing node ---------- */
 
+
+/* B1.2: Selection and inline editing */
+
+var selectedDiagramNodeId = null;
+var activeDiagramTextEdit = null;
+
+
+/* B2.2 — Direct measure selection */
+
+var selectedDiagramMeasure = null;
+var measureContextMenuEl = null;
+
+function updateMeasureSelectionVisuals() {
+  document.querySelectorAll(".diagram-measure-row").forEach(function (row) {
+    var selected = !!selectedDiagramMeasure &&
+      row.dataset.nodeId === selectedDiagramMeasure.nodeId &&
+      Number(row.dataset.measureIndex) === selectedDiagramMeasure.index;
+
+    row.classList.toggle("diagram-measure-selected", selected);
+    row.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+}
+
+function clearSelectedDiagramMeasure() {
+  selectedDiagramMeasure = null;
+  updateMeasureSelectionVisuals();
+}
+
+function selectDiagramMeasure(nodeId, index, toggle) {
+  // Do not interrupt unfinished driver text editing.
+  if (activeDiagramTextEdit) return;
+
+  var node = nodes.find(function (n) {
+    return n.id === nodeId;
+  });
+
+  if (!node || !Array.isArray(node.measures) || !node.measures[index]) {
+    return;
+  }
+
+  clearDiagramConnectionSelection();
+
+  var isSame = selectedDiagramMeasure &&
+    selectedDiagramMeasure.nodeId === nodeId &&
+    selectedDiagramMeasure.index === index;
+
+  selectedDiagramMeasure = (toggle && isSame)
+    ? null
+    : { nodeId: nodeId, index: index };
+
+  // Only one driver or measure may be selected.
+  selectedDiagramNodeId = null;
+
+  document.querySelectorAll(".diagram-node.diagram-selected")
+    .forEach(function (box) {
+      box.classList.remove("diagram-selected");
+    });
+
+  updateDiagramSelectionBar();
+  updateMeasureSelectionVisuals();
+}
+
+function closeMeasureContextMenu() {
+  if (measureContextMenuEl) {
+    measureContextMenuEl.remove();
+    measureContextMenuEl = null;
+  }
+}
+
+function openMeasureContextMenu(nodeId, index, x, y) {
+  closeNodeContextMenu();
+  closeMeasureContextMenu();
+
+  var menu = document.createElement("div");
+  menu.className = "diagram-measure-context-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "Measure actions");
+
+  function addAction(label, action) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("role", "menuitem");
+    button.textContent = label;
+
+    button.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeMeasureContextMenu();
+      action();
+    });
+
+    menu.appendChild(button);
+  }
+
+  addAction("Edit measure…", function () {
+    editMeasureOnNode(nodeId, index);
+  });
+
+  addAction("Delete measure…", function () {
+    deleteMeasureOnNode(nodeId, index);
+  });
+
+  document.body.appendChild(menu);
+  measureContextMenuEl = menu;
+
+  // Keep the small menu within the visible browser window.
+  var bounds = menu.getBoundingClientRect();
+
+  menu.style.left = Math.max(
+    8, Math.min(x, window.innerWidth - bounds.width - 8)
+  ) + "px";
+
+  menu.style.top = Math.max(
+    8, Math.min(y, window.innerHeight - bounds.height - 8)
+  ) + "px";
+
+  menu.querySelector("button").focus();
+}
+
+
+function selectDiagramNode(nodeId) {
+  // Do not change selection while editing text.
+  if (activeDiagramTextEdit) {
+    var feedback = document.getElementById("diagramEditFeedback");
+    if (feedback) {
+      feedback.textContent = "Save or cancel the current edit first.";
+    }
+    return;
+  }
+
+
+// B2.2: Selecting a driver clears measure selection.
+clearSelectedDiagramMeasure();
+closeMeasureContextMenu();
+clearDiagramConnectionSelection();
+
+  // Clicking the selected element again deselects it.
+  selectedDiagramNodeId =
+    selectedDiagramNodeId === nodeId ? null : nodeId;
+
+  document.querySelectorAll(".diagram-node").forEach(
+    function (box) {
+      box.classList.toggle(
+        "diagram-selected",
+        box.getAttribute("data-id") === selectedDiagramNodeId
+      );
+    }
+  );
+
+  updateDiagramSelectionBar();
+}
+
+
+function updateDiagramSelectionBar() {
+  var bar = document.getElementById("diagramSelectionBar");
+  if (!bar) return;
+
+  var node = nodes.find(function (n) {
+    return n.id === selectedDiagramNodeId;
+  });
+
+  if (!node) {
+    selectedDiagramNodeId = null;
+    activeDiagramTextEdit = null;
+    bar.hidden = true;
+    return;
+  }
+
+  // Only show the selection bar during active editing.
+// Save and Cancel remain available there.
+bar.hidden = true;
+
+  document.getElementById(
+    "diagramSelectedDescription"
+  ).textContent = getLevelLabel(node.level) + ": " + node.text;
+
+  var editing = !!activeDiagramTextEdit;
+
+  document.getElementById("diagramEditTextBtn").hidden = true;
+  document.getElementById("diagramSaveTextBtn").hidden = !editing;
+  document.getElementById("diagramCancelTextBtn").hidden = !editing;
+
+  document.getElementById("diagramEditFeedback").textContent =
+    editing
+      ? "Editing inside the box. Ctrl+Enter to save; Escape to cancel."
+      : "";
+}
+
 function editNode(nodeId) {
   var node = nodes.find(function (n) {
     return n.id === nodeId;
   });
-  if (!node) return;
 
-  var newText = window.prompt("Edit text for this item:", node.text);
-  if (newText === null) {
-    // user pressed Cancel
-    return;
+    if (!node || activeDiagramTextEdit) return;
+
+clearSelectedDiagramMeasure();
+closeMeasureContextMenu();
+clearDiagramConnectionSelection();
+
+  selectedDiagramNodeId = nodeId;
+
+  activeDiagramTextEdit = {
+    id: nodeId,
+    draft: node.text
+  };
+
+  renderDiagram();
+  updateDiagramSelectionBar();
+
+  var input = document.getElementById("diagramInlineText");
+
+  if (input) {
+    input.focus();
+    input.select();
   }
-  newText = newText.trim();
-  if (!newText) {
-    alert("Text cannot be empty.");
-    return;
+}
+
+function saveDiagramInlineText() {
+  if (!activeDiagramTextEdit) return;
+
+  var id = activeDiagramTextEdit.id;
+  var input = document.getElementById("diagramInlineText");
+
+  var nextText = (
+    input ? input.value : activeDiagramTextEdit.draft
+  ).trim();
+
+  if (!nextText) {
+    var feedback =
+      document.getElementById("diagramInlineTextFeedback") ||
+      document.getElementById("diagramEditFeedback");
+
+    if (feedback) {
+      feedback.textContent = "Text cannot be empty.";
+    }
+
+    if (input) input.focus();    return;
   }
 
-  node.text = newText;
+  var node = nodes.find(function (n) {
+    return n.id === id;
+  });
+
+
+  if (node) {
+    node.text = nextText;
+
+    // Apply the colour selected during inline editing.
+    if (Object.prototype.hasOwnProperty.call(
+      activeDiagramTextEdit, "pendingColour"
+    )) {
+      node.color = activeDiagramTextEdit.pendingColour;
+
+      // Commit a newly named colour to the shared palette.
+      var option = activeDiagramTextEdit.pendingColourOption;
+
+      if (option) {
+        var existingOption = findColorOptionByValue(option.value);
+
+        if (existingOption) {
+          existingOption.label = option.label;
+        } else {
+          colorOptions.push(option);
+        }
+      }
+    }
+  }
+
+  dismissInlineColourMenu();
+  activeDiagramTextEdit = null;
+
+  // Recalculate the box height after editing.
+  delete measuredBoxHeightsById[id];
+  delete measuredItemHeightsById[id];
+
+  updateAllViews();
+}
+
+
+function cancelDiagramInlineText() {
+  if (!activeDiagramTextEdit) return;
+  dismissInlineColourMenu();
+
+  var editing = activeDiagramTextEdit;
+  activeDiagramTextEdit = null;
+
+  if (editing.isNew) {
+    // Discard the unfinished box.
+    nodes = nodes.filter(function (n) {
+      return n.id !== editing.id;
+    });
+
+    // Remove its automatic connection.
+    connections = connections.filter(function (c) {
+      return c.fromId !== editing.id &&
+             c.toId !== editing.id;
+    });
+
+    // Restore the identifier counter.
+    nextId = editing.previousNextId;
+
+    // Return selection to the parent box.
+    selectedDiagramNodeId = editing.parentId;
+
+    delete measuredBoxHeightsById[editing.id];
+    delete measuredItemHeightsById[editing.id];
+  }
+
   updateAllViews();
 }
 
@@ -2279,66 +3820,246 @@ function removeConnectionForNode(nodeId) {
   updateAllViews();
 }
 
-function handleConnectionButtonClick(nodeId) {
-  // Does this node currently have any incoming connections?
-  var hasParents = connections.some(function (c) {
-    return c.toId === nodeId;
-  });
 
-  // If there are no parents, just add a new connection as before
-  if (!hasParents) {
-    addConnectionForNode(nodeId);
+function handleConnectionButtonClick(nodeId) {
+  var refNode = nodes.find(function (n) { return n.id === nodeId; });
+  if (!refNode) return;
+
+  var previousLevel = getPreviousLevel(refNode.level);
+  if (!previousLevel) return;
+
+  var candidates = nodes.filter(function (n) {
+    return n.level === previousLevel && n.id !== nodeId;
+  });
+  if (!candidates.length) {
+    alert("There are no " + getLevelLabel(previousLevel) + " items to connect to.");
     return;
   }
 
-  var choice = window.prompt(
-    "What would you like to do?\n\n" +
-      "1 = Add a new connection\n" +
-      "2 = Remove an existing connection",
-    "1"
-  );
-  if (choice === null) return;
-  choice = choice.trim();
-
-  if (choice === "1") {
-    addConnectionForNode(nodeId);
-  } else if (choice === "2") {
-    removeConnectionForNode(nodeId);
+  // Protect unusual older diagrams rather than silently deleting their links.
+  var candidateIds = candidates.map(function (n) { return n.id; });
+  var unusualLink = connections.some(function (c) {
+    return c.toId === nodeId && candidateIds.indexOf(c.fromId) === -1;
+  });
+  if (unusualLink || (refNode.parentId && candidateIds.indexOf(refNode.parentId) === -1)) {
+    alert("This item has a connection outside the expected driver levels. " +
+      "No changes have been made. Please keep this saved diagram for review.");
+    return;
   }
+
+  if (document.getElementById("connectionEditorDialog")) return;
+
+  var connectedIds = connections.filter(function (c) {
+    return c.toId === nodeId;
+  }).map(function (c) { return c.fromId; });
+
+  var dialog = document.createElement("dialog");
+  dialog.id = "connectionEditorDialog";
+  dialog.setAttribute("aria-labelledby", "connectionEditorTitle");
+  dialog.style.cssText = "box-sizing:border-box;width:min(520px,calc(100vw - 24px));" +
+    "max-height:85vh;overflow-y:auto;border:1px solid #cbd5e1;border-radius:12px;" +
+    "padding:20px;background:#fff;color:#111;box-shadow:0 16px 44px rgba(0,0,0,.22);" +
+    "font-family:inherit;font-size:14px;";
+
+  function addText(tag, text, css, parent) {
+    var element = document.createElement(tag);
+    element.textContent = text;
+    if (css) element.style.cssText = css;
+    (parent || dialog).appendChild(element);
+    return element;
+  }
+
+  var title = addText("h2", "Manage connections", "margin:0 0 8px;font-size:20px;");
+  title.id = "connectionEditorTitle";
+  addText("p", refNode.text, "margin:0 0 12px;font-weight:600;overflow-wrap:anywhere;");
+  addText("p", "Select the " + getLevelLabel(previousLevel) +
+    " items that should connect to this element.",
+    "margin:0 0 14px;color:#475569;");
+
+  var list = document.createElement("div");
+  list.style.cssText = "display:grid;gap:8px;margin-bottom:14px;";
+  dialog.appendChild(list);
+  var checkboxes = [];
+
+  candidates.forEach(function (candidate) {
+    var label = document.createElement("label");
+    label.style.cssText = "display:flex;align-items:flex-start;gap:10px;" +
+      "padding:10px;border:1px solid #d1d5db;border-radius:8px;" +
+      "cursor:pointer;margin:0;min-height:44px;box-sizing:border-box;";
+
+    var checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = candidate.id;
+    checkbox.checked = connectedIds.indexOf(candidate.id) !== -1 ||
+      refNode.parentId === candidate.id;
+    checkbox.style.cssText = "width:18px;height:18px;margin:2px 0 0;" +
+      "flex-shrink:0;accent-color:#005eb8;";
+    label.appendChild(checkbox);
+
+    var details = document.createElement("span");
+    details.style.cssText = "display:block;min-width:0;overflow-wrap:anywhere;";
+    addText("span", candidate.text, "display:block;font-weight:600;", details);
+    if (refNode.parentId === candidate.id) {
+      addText("small", "Current main parent (sets layout position)",
+        "display:block;color:#005eb8;margin-top:3px;", details);
+    }
+    var ancestor = nodes.find(function (n) { return n.id === candidate.parentId; });
+    if (ancestor && candidates.length > 1) {
+      addText("small", "Under: " + ancestor.text,
+        "display:block;color:#64748b;margin-top:3px;", details);
+    }
+    label.appendChild(details);
+    list.appendChild(label);
+    checkboxes.push(checkbox);
+  });
+
+  addText("p", "If the main parent is unticked, another selected parent " +
+    "will become the main parent. Leaving all boxes unticked removes " +
+    "all incoming connections but keeps the element.",
+    "margin:0 0 16px;font-size:12px;color:#475569;");
+
+  var actions = document.createElement("div");
+  actions.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;";
+  dialog.appendChild(actions);
+
+  var cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.style.cssText = "background:#e8edf5;color:#005eb8;";
+  actions.appendChild(cancel);
+
+  var save = document.createElement("button");
+  save.type = "button";
+  save.textContent = "Save connections";
+  actions.appendChild(save);
+
+  dialog.addEventListener("close", function () {
+    dialog.remove();
+    // Rendering recreates diagram buttons: restore focus to the new one.
+    var boxes = document.querySelectorAll(".diagram-node");
+    for (var i = 0; i < boxes.length; i++) {
+      if (boxes[i].getAttribute("data-id") === nodeId) {
+        var button = boxes[i].querySelector(".diagram-add-left");
+        if (button) button.focus();
+        break;
+      }
+    }
+  });
+
+  cancel.addEventListener("click", function () { dialog.close(); });
+  save.addEventListener("click", function () {
+    var selectedIds = checkboxes.filter(function (input) {
+      return input.checked;
+    }).map(function (input) { return input.value; });
+
+    // Leave other nodes and their connections completely untouched.
+
+    connections = connections.filter(function (c) {
+      return c.toId !== nodeId ||
+        selectedIds.indexOf(c.fromId) !== -1;
+    });
+
+    selectedIds.forEach(function (parentId) {
+      var exists = connections.some(function (c) {
+        return c.fromId === parentId && c.toId === nodeId;
+      });
+
+      if (!exists) {
+        connections.push({
+          fromId: parentId,
+          toId: nodeId
+        });
+      }
+    });
+
+    // Keep the original main parent when still selected.
+    if (selectedIds.indexOf(refNode.parentId) === -1) {
+      refNode.parentId = selectedIds.length ? selectedIds[0] : "";
+    }
+
+    dialog.close();
+    updateAllViews();
+  });
+
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  if (checkboxes.length) checkboxes[0].focus();
 }
 
 
+
+
 function addChildForNode(nodeId) {
+  // Finish an existing edit before starting another box.
+  if (activeDiagramTextEdit) return;
+  if (document.querySelector(
+    "dialog[open], .diagram-measure-editor-overlay"
+  )) return;
+
   var refNode = nodes.find(function (n) {
     return n.id === nodeId;
   });
   if (!refNode) return;
 
   var nextLevel = getNextLevel(refNode.level);
-  if (!nextLevel) {
-    // No further level; keep same level for extra children
-    nextLevel = refNode.level;
-  }
+  if (!nextLevel) return;
 
-  var defaultPrompt =
-    "Enter text for new " + getLevelLabel(nextLevel) + " (child)";
-  var text = window.prompt(defaultPrompt, "");
-  if (!text) return;
+  var previousNextId = nextId;
 
   var newNode = createNode({
     level: nextLevel,
-    text: text.trim(),
+    text: "",
     parentId: refNode.id,
-    color: refNode.color // inherit colour
+    color: refNode.color
   });
 
-    insertAfterLastSibling(nodes, newNode);
+  insertAfterLastSibling(nodes, newNode);
 
-  // Record the connection parent -> child
-  connections.push({ fromId: refNode.id, toId: newNode.id });
+  // Automatically connect the new box to its parent.
+  connections.push({
+    fromId: refNode.id,
+    toId: newNode.id
+  });
 
-  updateAllViews();
+  clearSelectedDiagramMeasure();
+  closeMeasureContextMenu();
+  clearDiagramConnectionSelection();
 
+  selectedDiagramNodeId = newNode.id;
+
+  // Mark the new box as an unfinished draft.
+  activeDiagramTextEdit = {
+    id: newNode.id,
+    parentId: refNode.id,
+    previousNextId: previousNextId,
+    draft: "",
+    isNew: true
+  };
+
+  // Display it immediately without adding Undo history.
+  renderDiagram();
+  updateDiagramSelectionBar();
+
+  function focusNewEditor() {
+    if (!activeDiagramTextEdit ||
+        activeDiagramTextEdit.id !== newNode.id) return;
+
+    var input = document.getElementById(
+      "diagramInlineText"
+    );
+
+    if (input) input.focus();
+  }
+
+  focusNewEditor();
+
+  // Auto-sizing may cause one additional render.
+  // Return focus to the new text field afterwards.
+  if (window.requestAnimationFrame) {
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(focusNewEditor);
+    });
+  }
 }
 
 function ensureDefaultAim() {
@@ -2371,12 +4092,6 @@ function clearAllNodes() {
   // Clear palette too
   colorOptions = [];
   editingColorValue = null;
-
-  // Clear colour form inputs
-  var labelInput = document.getElementById("colorLabelInput");
-  var valueInput = document.getElementById("colorValueInput");
-  if (labelInput) labelInput.value = "";
-  if (valueInput) valueInput.value = "#fff7cc";
 
   updateNextIdFromNodes();
   ensureDefaultAim();
@@ -2452,12 +4167,22 @@ function getPortableProjectData() {
       };
     }),
 
+    
     connections: connections.map(function (c) {
-      return {
+      var saved = {
         fromId: (c.fromId || "").toString(),
         toId: (c.toId || "").toString()
       };
+
+      var style = normaliseConnectionOverride(c.style);
+
+      if (style) {
+        saved.style = style;
+      }
+
+      return saved;
     }),
+
 
     colorOptions: colorOptions.map(function (c) {
       return {
@@ -2478,7 +4203,10 @@ function getPortableProjectData() {
       verticalGap: diagramAppearance.verticalGap,
       fontSize: diagramAppearance.fontSize,
       fontFamily: diagramAppearance.fontFamily || "",
-      fontBold: !!diagramAppearance.fontBold
+      fontBold: !!diagramAppearance.fontBold,
+connectionStyle: normaliseConnectionStyle(
+  diagramAppearance.connectionStyle
+)
     },
 
     legendVisible: legendVisible !== false
@@ -2527,6 +4255,16 @@ function loadEmbeddedProjectIfPresent() {
       throw new Error("This is not a recognised portable driver diagram.");
     }
 
+
+// B2.5: Restore the saved connection style.
+// Older project files automatically use Bézier.
+diagramAppearance.connectionStyle =
+  normaliseConnectionStyle(
+    project.diagramAppearance &&
+    project.diagramAppearance.connectionStyle
+  );
+
+
     nodes = project.nodes.map(function (n) {
       return {
         id: (n.id || "").toString(),
@@ -2549,9 +4287,10 @@ function loadEmbeddedProjectIfPresent() {
     connections = Array.isArray(project.connections)
       ? project.connections
           .map(function (c) {
-            return {
+                        return {
               fromId: (c.fromId || "").toString(),
-              toId: (c.toId || "").toString()
+              toId: (c.toId || "").toString(),
+              style: normaliseConnectionOverride(c.style)
             };
           })
           .filter(function (c) {
@@ -2736,17 +4475,87 @@ function getPortableFilename() {
 /*
   Creates and downloads the portable HTML file.
 */
+
+
+/* Prevent losing unfinished edits during file operations. */
+function blockFileActionDuringEdit(action) {
+  if (!activeOutlineTextEdit && !activeDiagramTextEdit) {
+    return false;
+  }
+
+  var location = activeOutlineTextEdit
+    ? "Outline"
+    : "diagram box";
+
+  alert(
+    "Save or cancel the " + location +
+    " edit before " + action + ".\n\n" +
+    "Your diagram has not been changed."
+  );
+
+  return true;
+}
+
+
+/* Get PapaParse for inclusion in saved HTML diagrams. */
+function getPapaSourceForPortableExport() {
+  // When reopening an already-saved diagram, reuse
+  // its embedded copy of PapaParse.
+  var embedded = document.getElementById("portablePapaSource");
+
+  if (embedded && (embedded.textContent || "").trim()) {
+    return Promise.resolve(embedded.textContent);
+  }
+
+  // Otherwise, find the repository-hosted library.
+  var parserScript = Array.from(
+    document.querySelectorAll("script[src]")
+  ).find(function (script) {
+    return /(^|\/)papaparse\.min\.js([?#]|$)/i.test(
+      script.getAttribute("src") || ""
+    );
+  });
+
+  if (!parserScript) {
+    return Promise.reject(
+      new Error("Could not find papaparse.min.js.")
+    );
+  }
+
+  return fetch(parserScript.src, { cache: "no-store" })
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error(
+          "Could not load PapaParse: HTTP " + response.status
+        );
+      }
+      return response.text();
+    });
+}
+
+
+
+
 function downloadPortableHtml() {
-  if (!nodes.length) {
-    alert("There is no driver diagram to save.");
+
+  if (blockFileActionDuringEdit("saving the diagram")) return;
+
+
+  if (!nodes.length) {    alert("There is no driver diagram to save.");
     return;
   }
 
   var projectData = getPortableProjectData();
   var projectJson = makeJsonSafeForHtml(projectData);
 
-  getDriverSourceForPortableExport()
-    .then(function (driverSource) {
+
+  Promise.all([
+    getDriverSourceForPortableExport(),
+    getPapaSourceForPortableExport()
+  ]).then(function (sources) {
+    var driverSource = sources[0];
+    var papaSource = sources[1];
+
       /*
         Clone the current page.
 
@@ -2756,19 +4565,126 @@ function downloadPortableHtml() {
       var htmlClone =
         document.documentElement.cloneNode(true);
 
+
+      // Embed PapaParse directly in the saved HTML.
+      var papaReference = Array.from(
+        htmlClone.querySelectorAll("script")
+      ).find(function (script) {
+        return script.id === "portablePapaSource" ||
+          /(^|\/)papaparse\.min\.js([?#]|$)/i.test(
+            script.getAttribute("src") || ""
+          );
+      });
+
+      if (!papaReference) {
+        throw new Error(
+          "Could not find the PapaParse script in the page."
+        );
+      }
+
+      var portablePapaScript =
+        document.createElement("script");
+
+      portablePapaScript.id = "portablePapaSource";
+
+      portablePapaScript.textContent =
+        papaSource.replace(
+          /<\/script/gi,
+          "<\\/script"
+        );
+
+      papaReference.replaceWith(portablePapaScript);
+
+
+
+      // Restore default panel/menu states in portable saves.
+      // An icon-only collapsed panel must never become impossible to reopen.
+      var panelInCopy = htmlClone.querySelector("#controlsPanel");
+      if (panelInCopy) panelInCopy.style.display = "";
+      var mainInCopy = htmlClone.querySelector("main");
+      if (mainInCopy) {
+        mainInCopy.style.gridTemplateColumns = "";
+        mainInCopy.classList.remove("sidebar-collapsed");
+      }
+      var panelButtonInCopy = htmlClone.querySelector("#btnToggleControls");
+      if (panelButtonInCopy) {
+        panelButtonInCopy.setAttribute("aria-expanded", "true");
+        panelButtonInCopy.setAttribute("aria-label", "Hide editing panel");
+        panelButtonInCopy.title = "Hide editing panel";
+      }
+      var exportMenuInCopy = htmlClone.querySelector("#exportChartMenu");
+      if (exportMenuInCopy) exportMenuInCopy.removeAttribute("open");
+
+
+// B1.4: Embed the external CSS in saved HTML files.
+// This keeps saved diagrams visually self-contained.
+
+var liveStylesheet = document.querySelector(
+  'link[rel="stylesheet"][href="./styles.css"]'
+);
+
+var clonedStylesheet = htmlClone.querySelector(
+  'link[rel="stylesheet"][href="./styles.css"]'
+);
+
+if (!liveStylesheet ||
+    !liveStylesheet.sheet ||
+    !clonedStylesheet) {
+  throw new Error(
+    "Could not locate the loaded styles.css stylesheet."
+  );
+}
+
+var embeddedCss;
+
+try {
+  embeddedCss = Array.from(
+    liveStylesheet.sheet.cssRules
+  ).map(function (rule) {
+    return rule.cssText;
+  }).join("\n");
+} catch (error) {
+  throw new Error(
+    "Could not embed styles.css: " + error.message
+  );
+}
+
+if (!embeddedCss.trim()) {
+  throw new Error("styles.css contained no readable rules.");
+}
+
+var embeddedStyleElement = document.createElement("style");
+embeddedStyleElement.textContent = embeddedCss;
+
+// Replace the external reference with the actual CSS.
+clonedStylesheet.replaceWith(embeddedStyleElement);
+
+
       /*
         Remove temporary menus created while using the tool.
       */
       htmlClone
         .querySelectorAll(
-          "#nodeContextMenu, .node-context-submenu"
+          "#nodeContextMenu, .node-context-submenu, " +
+"#quickColourDialog, .diagram-measure-context-menu, " +
+".diagram-quick-add-measure, .diagram-connection-hit " 
         )
+        
         .forEach(function (element) {
           element.remove();
         });
 
+      htmlClone.querySelectorAll(
+        ".diagram-connection-visible"
+      ).forEach(function (element) {
+        element.setAttribute("stroke", "#666");
+        element.setAttribute("stroke-width", "2.5");
+        element.removeAttribute("data-selected");
+      });
+
       /*
         Ensure the Help window is closed in the saved copy.
+
       */
       var helpOverlay =
         htmlClone.querySelector("#helpOverlay");
@@ -2776,6 +4692,51 @@ function downloadPortableHtml() {
       if (helpOverlay) {
         helpOverlay.classList.remove("is-open");
         helpOverlay.setAttribute("aria-hidden", "true");
+      }
+
+            // Ensure the AI guidance window is closed in saved HTML.
+      var aiDialogInCopy =
+        htmlClone.querySelector("#aiGuidanceDialog");
+
+      if (aiDialogInCopy) {
+        aiDialogInCopy.removeAttribute("open");
+      }
+
+      // A portable diagram must never save a user's edited AI prompt.
+      var promptInCopy = htmlClone.querySelector("#aiPromptEditor");
+      if (promptInCopy) {
+        promptInCopy.value = "";
+        promptInCopy.defaultValue = "";
+        promptInCopy.textContent = "";
+      }
+
+      var promptStatusInCopy = htmlClone.querySelector("#aiPromptStatus");
+      if (promptStatusInCopy) promptStatusInCopy.textContent = "";
+
+      // Clear temporary copy feedback in saved HTML.
+      var copyFeedbackInCopy =
+        htmlClone.querySelector("#aiCopyFeedback");
+
+      if (copyFeedbackInCopy) {
+        copyFeedbackInCopy.hidden = true;
+        copyFeedbackInCopy.textContent = "";
+      }
+
+      // Never preserve pasted CSV in an editable HTML copy.
+      var pastedCsvInCopy =
+        htmlClone.querySelector("#aiCsvPasteInput");
+
+      if (pastedCsvInCopy) {
+        pastedCsvInCopy.value = "";
+        pastedCsvInCopy.defaultValue = "";
+        pastedCsvInCopy.textContent = "";
+      }
+
+      var pastedCsvStatusInCopy =
+        htmlClone.querySelector("#aiCsvPasteStatus");
+
+      if (pastedCsvStatusInCopy) {
+        pastedCsvStatusInCopy.textContent = "";
       }
 
       /*
@@ -2879,7 +4840,8 @@ function downloadPortableHtml() {
 
       alert(
         "The portable HTML file could not be created.\n\n" +
-        "The tool could not read driver.js. This can happen when the original tool is opened directly from a folder rather than through a web address or local web server.\n\n" +
+        "The application could not embed its JavaScript or stylesheet. " +
+	"Try saving from the hosted development website.\n\n" +
         "Technical detail: " +
         error.message
       );
@@ -2890,6 +4852,9 @@ function downloadPortableHtml() {
 /* ---------- CSV import / export ---------- */
 
 function downloadCsv() {
+
+  if (blockFileActionDuringEdit("downloading a CSV backup")) return;
+
   if (nodes.length === 0) {
     alert("No items to export yet.");
     return;
@@ -2922,18 +4887,52 @@ function downloadCsv() {
       font_size: diagramAppearance.fontSize,
       font_family: diagramAppearance.fontFamily || "",
       font_bold: diagramAppearance.fontBold ? "1" : "0",
+connection_style: normaliseConnectionStyle(
+  diagramAppearance.connectionStyle
+),
 	title_aim: columnTitles.aim,
 	title_primary: columnTitles.primary,
 	title_secondary: columnTitles.secondary,
 	title_change: columnTitles.change,
 	palette_json: JSON.stringify(colorOptions || []),
-        measures_json: JSON.stringify(n.measures || [])
+
+        measures_json: JSON.stringify(n.measures || []),
+
+        connection_styles_json: JSON.stringify(
+          connections.filter(function (c) {
+            return c.toId === n.id &&
+              normaliseConnectionOverride(c.style);
+          }).map(function (c) {
+            return {
+              fromId: c.fromId,
+              style: normaliseConnectionOverride(c.style)
+            };
+          })
+        ),
+        // Explicit marker ensures safe spreadsheet escaping can be
+        // reversed when this app reopens the CSV backup.
+        csv_safety_version: "apostrophe-v1"
+
 
     };
   });
 
 
-  var csv = Papa.unparse(dataForCsv);
+  // Prefix potentially executable spreadsheet cells. Only CSV output
+  // is escaped; source diagram content remains unchanged.
+  var spreadsheetSafeRows = dataForCsv.map(function (row) {
+    var safe = {};
+    Object.keys(row).forEach(function (key) {
+      var value = row[key];
+      safe[key] = typeof value === "string" &&
+        (value.charAt(0) === "'" ||
+         /^[\s\u0000-\u001f]*[=+\-@]/.test(value))
+        ? "'" + value
+        : value;
+    });
+    return safe;
+  });
+  var csv = Papa.unparse(spreadsheetSafeRows, { quotes: true });
   var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   var url = URL.createObjectURL(blob);
 
@@ -2946,20 +4945,441 @@ function downloadCsv() {
   URL.revokeObjectURL(url);
 }
 
-function uploadCsv(file) {
+
+/* B4.1d.1 — Validate CSV before replacing the current diagram. */
+
+function validateDiagramCsvBeforeImport(results) {
+  var errors = [];
+
+  var rows = results && Array.isArray(results.data)
+    ? results.data : [];
+
+  var fields = results && results.meta &&
+    Array.isArray(results.meta.fields)
+      ? results.meta.fields
+      : (rows[0] ? Object.keys(rows[0]) : []);
+
+  // Do not ignore errors reported by the CSV parser.
+  if (results && results.errors && results.errors.length) {
+    errors.push(
+      "The CSV contains parsing errors (check its quoting and columns)."
+    );
+  }
+
+  // These columns are required for a valid driver diagram.
+  ["id", "level", "text", "parent_id"].forEach(function (field) {
+    if (fields.indexOf(field) === -1) {
+      errors.push("Missing required column: " + field + ".");
+    }
+  });
+
+  if (!rows.length) {
+    errors.push("The CSV contains no diagram elements.");
+  }
+
+  var identifiers = Object.create(null);
+  var references = [];
+  var aimCount = 0;
+
+  rows.forEach(function (row, index) {
+    var line = index + 2; // Row 1 contains the headers.
+
+    if (!row || typeof row !== "object" ||
+        Array.isArray(row)) {
+      errors.push("Row " + line + ": not a valid record.");
+      return;
+    }
+
+    var id = String(
+      row.id == null ? "" : row.id
+    ).trim();
+
+    var level = String(
+      row.level == null ? "" : row.level
+    ).trim();
+
+    var nodeText = String(
+      row.text == null ? "" : row.text
+    ).trim();
+
+    var parent = String(
+      row.parent_id == null ? "" : row.parent_id
+    ).trim();
+
+    // Check element identifiers.
+    if (!id) {
+      errors.push("Row " + line + ": missing element ID.");
+    } else if (identifiers[id]) {
+      errors.push(
+        "Row " + line + ": duplicate element ID " + id + "."
+      );
+    } else {
+      identifiers[id] = true;
+    }
+
+    // Check diagram levels.
+    if (["aim", "primary", "secondary", "change"]
+        .indexOf(level) === -1) {
+      errors.push(
+        "Row " + line + ": unrecognised level " +
+        (level || "(blank)") + "."
+      );
+    }
+
+    if (level === "aim") aimCount++;
+
+    if (!nodeText) {
+      errors.push("Row " + line + ": missing element text.");
+    }
+
+    // Collect parent references to verify afterwards.
+    if (parent) {
+      references.push({ line: line, id: parent });
+    }
+
+    var extra = String(
+      row.extra_parents == null ? "" : row.extra_parents
+    ).trim();
+
+    if (extra) {
+      extra.split(/[;,]/).forEach(function (value) {
+        value = value.trim();
+        if (value) {
+          references.push({ line: line, id: value });
+        }
+      });
+    }
+
+    // Check optional structured fields.
+    // Older CSVs may not include these columns.
+    [
+      "measures_json",
+      "palette_json",
+      "connection_styles_json"
+    ].forEach(function (field) {
+
+      var raw = String(
+        row[field] == null ? "" : row[field]
+      ).trim();
+
+      if (!raw) return;
+
+      try {
+        var value = JSON.parse(raw);
+
+        if (!Array.isArray(value)) {
+          errors.push(
+            "Row " + line + ": " + field +
+            " must contain a list."
+          );
+        }
+      } catch (error) {
+        errors.push(
+          "Row " + line + ": invalid JSON in " +
+          field + "."
+        );
+      }
+    });
+  });
+
+  if (rows.length && !aimCount) {
+    errors.push(
+      "The CSV does not contain an Aim element."
+    );
+  }
+
+  // Confirm that all referenced parents actually exist.
+  references.forEach(function (reference) {
+    if (!identifiers[reference.id]) {
+      errors.push(
+        "Row " + reference.line +
+        ": parent ID " + reference.id +
+        " does not exist in this CSV."
+      );
+    }
+  });
+
+
+  // B4.1d.2a — Detect self-parenting and circular connections.
+  var nodeIds = Object.keys(identifiers);
+  var incomingCount = Object.create(null);
+  var childrenByParent = Object.create(null);
+  var seenLinks = Object.create(null);
+
+  nodeIds.forEach(function (id) {
+    incomingCount[id] = 0;
+    childrenByParent[id] = [];
+  });
+
+  rows.forEach(function (row, index) {
+    if (!row || typeof row !== "object" ||
+        Array.isArray(row)) return;
+
+    var childId = String(
+      row.id == null ? "" : row.id
+    ).trim();
+
+    if (!identifiers[childId]) return;
+
+    var mainParent = String(
+      row.parent_id == null ? "" : row.parent_id
+    ).trim();
+
+    var extraParents = String(
+      row.extra_parents == null ? "" : row.extra_parents
+    ).split(/[;,]/).map(function (value) {
+      return value.trim();
+    }).filter(Boolean);
+
+    var parents = (mainParent ? [mainParent] : [])
+      .concat(extraParents);
+
+    parents.forEach(function (parentId) {
+      // Missing parents were already reported above.
+      if (!identifiers[parentId]) return;
+
+      if (parentId === childId) {
+        errors.push(
+          "Row " + (index + 2) + ": element " +
+          childId + " cannot be its own parent."
+        );
+        return;
+      }
+
+      // Ignore duplicate links when building the graph.
+      var linkKey = JSON.stringify([parentId, childId]);
+      if (seenLinks[linkKey]) return;
+
+      seenLinks[linkKey] = true;
+      childrenByParent[parentId].push(childId);
+      incomingCount[childId]++;
+    });
+  });
+
+  // Process elements with no incoming parent connections.
+  // Any unprocessed elements indicate a circular relationship.
+  var queue = nodeIds.filter(function (id) {
+    return incomingCount[id] === 0;
+  });
+
+  var processed = 0;
+
+  for (var i = 0; i < queue.length; i++) {
+    var id = queue[i];
+    processed++;
+
+    childrenByParent[id].forEach(function (childId) {
+      incomingCount[childId]--;
+
+      if (incomingCount[childId] === 0) {
+        queue.push(childId);
+      }
+    });
+  }
+
+  if (processed !== nodeIds.length) {
+    errors.push(
+      "The CSV contains a circular connection between elements."
+    );
+  }
+
+
+  // Check the contents of optional JSON fields as well.
+  validateDiagramCsvStructuredFields(rows, errors);
+
+  return errors;
+}
+
+/* B4.1d.2b — Validate structured CSV field contents. */
+
+function validateDiagramCsvStructuredFields(rows, errors) {
+  rows.forEach(function (row, index) {
+    if (!row || typeof row !== "object" ||
+        Array.isArray(row)) return;
+
+    var rowNumber = index + 2;
+
+    function getArray(field) {
+      var raw = row[field];
+
+      // Optional columns are absent in older CSV files.
+      if (raw == null || String(raw).trim() === "") {
+        return null;
+      }
+
+      try {
+        var value = JSON.parse(String(raw));
+        return Array.isArray(value) ? value : null;
+      } catch (e) {
+        // The existing validator already reports invalid JSON.
+        return null;
+      }
+    }
+
+    // Validate individual measures.
+    var measures = getArray("measures_json");
+
+    if (measures) {
+      measures.forEach(function (measure, i) {
+        var where = "Row " + rowNumber +
+          ": measures_json entry " + (i + 1);
+
+        if (!measure || typeof measure !== "object" ||
+            Array.isArray(measure)) {
+          errors.push(where + " must be a measure object.");
+          return;
+        }
+
+        if (typeof measure.text !== "string" ||
+            !measure.text.trim()) {
+          errors.push(where + " needs non-empty text.");
+        }
+
+        // Missing type is allowed for older files.
+        var type = measure.type;
+
+        if (type != null && type !== "" &&
+            (typeof type !== "string" ||
+            ["outcome", "process", "balancing", "none"]
+              .indexOf(type.trim().toLowerCase()) === -1)) {
+          errors.push(where + " has an invalid measure type.");
+        }
+      });
+    }
+
+    // Validate named colours in the shared palette.
+    var palette = getArray("palette_json");
+
+    if (palette) {
+      palette.forEach(function (option, i) {
+        var where = "Row " + rowNumber +
+          ": palette_json entry " + (i + 1);
+
+        if (!option || typeof option !== "object" ||
+            Array.isArray(option)) {
+          errors.push(where + " must be a colour object.");
+          return;
+        }
+
+        if (typeof option.label !== "string" ||
+            !option.label.trim()) {
+          errors.push(where + " needs a colour name.");
+        }
+
+        if (typeof option.value !== "string" ||
+            !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(
+              option.value.trim())) {
+          errors.push(where + " needs a valid hex colour.");
+        }
+      });
+    }
+
+    // Validate individual connection styles.
+    var styles = getArray("connection_styles_json");
+
+    if (styles) {
+      var mainParent = String(
+        row.parent_id == null ? "" : row.parent_id
+      ).trim();
+
+      var allowedParents =
+        (mainParent ? [mainParent] : []).concat(
+          String(
+            row.extra_parents == null
+              ? "" : row.extra_parents
+          ).split(/[;,]/).map(function (id) {
+            return id.trim();
+          }).filter(Boolean)
+        );
+
+      styles.forEach(function (entry, i) {
+        var where = "Row " + rowNumber +
+          ": connection_styles_json entry " + (i + 1);
+
+        if (!entry || typeof entry !== "object" ||
+            Array.isArray(entry)) {
+          errors.push(where + " must be a connection object.");
+          return;
+        }
+
+        var fromId = String(
+          entry.fromId == null ? "" : entry.fromId
+        ).trim();
+
+        if (!fromId ||
+            allowedParents.indexOf(fromId) === -1) {
+          errors.push(
+            where +
+            " references a parent not listed for this element."
+          );
+        }
+
+        if (["straight", "orthogonal", "bezier"]
+            .indexOf(entry.style) === -1) {
+          errors.push(where + " has an invalid line style.");
+        }
+      });
+    }
+  });
+}
+
+
+function uploadCsv(file, onFinished) {
+  if (blockFileActionDuringEdit("opening a CSV file")) {
+    if (typeof onFinished === "function") {
+      onFinished(false);
+    }
+    return;
+  }
+
+
+
+
   if (!file) return;
 
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: function (results) {
-      if (results.errors && results.errors.length > 0) {
-        console.error("CSV parse errors", results.errors);
+      // Restore exact original values in CSV backups created by this
+      // version. Never strip apostrophes from older or external CSVs.
+      (results.data || []).forEach(function (row) {
+        if (!row || row.csv_safety_version !== "apostrophe-v1") return;
+        Object.keys(row).forEach(function (key) {
+          var value = row[key];
+          if (typeof value === "string" &&
+              (value.slice(0, 2) === "''" ||
+               (value.charAt(0) === "'" &&
+                /^[\s\u0000-\u001f]*[=+\-@]/.test(value.slice(1))))) {
+            row[key] = value.slice(1);
+          }
+        });
+      });
+
+      // B4.1d.1: Reject invalid files before changing data.
+      var errors = validateDiagramCsvBeforeImport(results);
+
+      if (errors.length) {
+        alert(
+          "CSV import cancelled. Your current diagram has not changed.\n\n" +
+          errors.slice(0, 8).join("\n") +
+          (errors.length > 8
+            ? "\n...and " + (errors.length - 8) + " more issue(s)."
+            : "")
+        );
+
+        if (typeof onFinished === "function") {
+          onFinished(false);
+        }
+
+        return;
       }
 
       var rows = results.data || [];
+
       var imported = [];
       var extraConnectionsRaw = []; // { childId, parents[] }
+      var connectionStylesRaw = [];
       var appearanceFromCsv = null;
       var titlesFromCsv = null;
       var paletteFromCsv = null;
@@ -2997,11 +5417,38 @@ function uploadCsv(file) {
           text: text,
           parentId: parentId,
           color: color,
-          autoSize: ((row.auto_size || "").toString().trim() === "1"),
+          // Missing or blank means auto-size on; explicit 0 means off.
+          autoSize: (row.auto_size == null ||
+            String(row.auto_size).trim() === "" ||
+            String(row.auto_size).trim() === "1"),
+
           measures: measures
         });
 
-        // Parse extra parents into an array of IDs
+        var stylesJson = (
+          row.connection_styles_json || ""
+        ).toString().trim();
+
+        if (stylesJson) {
+          try {
+            var parsedStyles = JSON.parse(stylesJson);
+
+            if (Array.isArray(parsedStyles)) {
+              connectionStylesRaw.push({
+                childId: id,
+                entries: parsedStyles
+              });
+            }
+          } catch (error) {
+            console.warn(
+              "Invalid connection_styles_json on CSV row " +
+              (index + 1),
+              error
+            );
+          }
+        }
+
+        // Parse extra parentsinto an array of IDs
         if (extraParentsField) {
           var parents = extraParentsField
             .split(/[;,]/)
@@ -3047,13 +5494,16 @@ function uploadCsv(file) {
           var ff = (row.font_family || "").toString();
           var fbRaw = (row.font_bold || "").toString().trim().toLowerCase();
           var fb = fbRaw === "1" || fbRaw === "true" || fbRaw === "yes";
+var connectionStyleFromCsv =
+  (row.connection_style || "").toString().trim();
 
           var hasAny =
             (row.box_height && !isNaN(bh)) ||
             (row.vertical_gap && !isNaN(vg)) ||
             (row.font_size && !isNaN(fs)) ||
             ff ||
-            fbRaw;
+fbRaw ||
+connectionStyleFromCsv;
 
           if (hasAny) {
             appearanceFromCsv = {
@@ -3061,7 +5511,10 @@ function uploadCsv(file) {
               verticalGap: isFinite(vg) && vg >= 0 ? vg : diagramAppearance.verticalGap,
               fontSize: isFinite(fs) && fs > 0 ? fs : diagramAppearance.fontSize,
               fontFamily: ff,
-              fontBold: fb
+              fontBold: fb,
+connectionStyle: normaliseConnectionStyle(
+  connectionStyleFromCsv
+)
             };
           }
         }
@@ -3104,6 +5557,37 @@ function uploadCsv(file) {
         });
       });
 
+
+// Restore optional per-connection styles after
+// all connections have been rebuilt.
+
+connectionStylesRaw.forEach(function (entry) {
+  entry.entries.forEach(function (item) {
+    if (!item || typeof item !== "object") return;
+
+    var fromId = (item.fromId || "").toString();
+    var style = normaliseConnectionOverride(item.style);
+
+    if (!fromId || !style) return;
+
+    var link = connections.find(function (c) {
+      return c.fromId === fromId &&
+        c.toId === entry.childId;
+    });
+
+    if (link) {
+      link.style = style;
+    }
+  });
+});
+
+// Restore the CSV style; use Bézier for older files.
+
+diagramAppearance.connectionStyle =
+  normaliseConnectionStyle(
+    appearanceFromCsv && appearanceFromCsv.connectionStyle
+  );
+
       // Apply appearance
       if (appearanceFromCsv) {
         diagramAppearance.boxHeight = appearanceFromCsv.boxHeight;
@@ -3126,32 +5610,1096 @@ function uploadCsv(file) {
       renderLegend();
 
       updateAllViews();
+
       alert("Loaded " + nodes.length + " items from CSV.");
+
+      if (typeof onFinished === "function") {
+        onFinished(true, nodes.length);
+      }
+    },
+
+    error: function (error) {
+      alert(
+        "CSV could not be read. Your current diagram has not changed.\n\n" +
+        (error && error.message
+          ? error.message
+          : "Please check the selected file.")
+      );
+
+      if (typeof onFinished === "function") {
+        onFinished(false);
+      }
+    }  });
+}
+
+
+/* B4.4a.1 — Read-only Outline view (same diagram data). */
+
+
+var diagramViewMode = "diagram";
+var diagramOutlineOpenById = Object.create(null);
+
+
+/* B4.4c — Track an unfinished Outline text edit. */
+var activeOutlineTextEdit = null;
+
+/* B4.4d.1 — Add a child from Outline without creating a draft node. */
+
+function beginOutlineChildEdit(parentId) {
+  if (diagramViewMode !== "outline" || activeDiagramTextEdit) return;
+
+  if (activeOutlineTextEdit) {
+    alert("Save or cancel the current Outline edit first.");
+
+    var existingInput =
+      document.getElementById("diagramOutlineEditInput");
+
+    if (existingInput) existingInput.focus();
+    return;
+  }
+
+  var parent = nodes.find(function (node) {
+    return String(node.id) === String(parentId);
+  });
+
+  if (!parent) return;
+
+  var childLevel = getNextLevel(parent.level);
+  if (!childLevel) return;
+
+  activeOutlineTextEdit = {
+    isNew: true,
+    parentId: String(parent.id),
+    level: childLevel,
+    draft: ""
+  };
+
+  diagramOutlineOpenById[String(parent.id)] = true;
+  renderDiagramOutline();
+
+  var input = document.getElementById("diagramOutlineEditInput");
+  if (input) input.focus();
+}
+
+function finishOutlineChildEdit(save) {
+  var editing = activeOutlineTextEdit;
+  if (!editing || !editing.isNew) return;
+
+  var input = document.getElementById("diagramOutlineEditInput");
+  var text = String(input ? input.value : editing.draft).trim();
+  var error = document.getElementById("diagramOutlineEditError");
+
+  if (save && !text) {
+    if (error) error.textContent = "Text cannot be empty.";
+    if (input) input.focus();
+    return;
+  }
+
+  var parent = nodes.find(function (node) {
+    return String(node.id) === editing.parentId;
+  });
+
+  if (save && (!parent || getNextLevel(parent.level) !== editing.level)) {
+    if (error) error.textContent = "The parent is no longer available.";
+    return;
+  }
+
+  activeOutlineTextEdit = null;
+  var newNode = null;
+
+  if (save) {
+    newNode = createNode({
+      level: editing.level,
+      text: text,
+      parentId: parent.id,
+      color: parent.color || ""
+    });
+
+    insertAfterLastSibling(nodes, newNode);
+
+    connections.push({
+      fromId: parent.id,
+      toId: newNode.id
+    });
+
+    diagramOutlineOpenById[String(parent.id)] = true;
+
+    // One completed addition creates one Undo entry.
+    updateAllViews();
+
+  } else {
+    // Cancel leaves nodes, connections, IDs and history unchanged.
+    renderDiagramOutline();
+  }
+
+  // Keep keyboard focus near the same element.
+  var selector = save
+    ? ".diagram-outline-edit-button"
+    : ".diagram-outline-add-button";
+
+  var targetId = save ? String(newNode.id) : editing.parentId;
+  var attribute = save ? "outlineNodeId" : "outlineParentId";
+
+  Array.from(
+    document.querySelectorAll("#diagramOutlineTree " + selector)
+  ).some(function (button) {
+    if (button.dataset[attribute] !== targetId) return false;
+    button.focus();
+    return true;
+  });
+}
+
+function beginOutlineTextEdit(nodeId) {
+
+  var id = String(nodeId);
+
+  if (activeDiagramTextEdit) return;
+
+  if (activeOutlineTextEdit) {
+    if (activeOutlineTextEdit.id !== id) {
+      alert("Save or cancel the current Outline edit first.");
     }
+
+    var currentInput =
+      document.getElementById("diagramOutlineEditInput");
+
+    if (currentInput) currentInput.focus();
+    return;
+  }
+
+  var node = nodes.find(function (item) {
+    return String(item.id) === id;
+  });
+
+  if (!node) return;
+
+  activeOutlineTextEdit = {
+    id: id,
+    draft: node.text || ""
+  };
+
+  renderDiagramOutline();
+
+  var input =
+    document.getElementById("diagramOutlineEditInput");
+
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+function finishOutlineTextEdit(save) {
+  if (!activeOutlineTextEdit) return;
+
+  // New children have no ID until their text is confirmed.
+  if (activeOutlineTextEdit.isNew) {
+    finishOutlineChildEdit(save);
+    return;
+  }
+
+  var id = activeOutlineTextEdit.id;  var input =
+    document.getElementById("diagramOutlineEditInput");
+
+  var nextText = String(
+    input ? input.value : activeOutlineTextEdit.draft
+  ).trim();
+
+  if (save && !nextText) {
+    var error =
+      document.getElementById("diagramOutlineEditError");
+
+    if (error) {
+      error.textContent = "Text cannot be empty.";
+    }
+
+    if (input) input.focus();
+    return;
+  }
+
+  var node = nodes.find(function (item) {
+    return String(item.id) === id;
+  });
+
+  var changed = !!(
+    save && node && nextText !== node.text
+  );
+
+  activeOutlineTextEdit = null;
+
+  if (changed) {
+    node.text = nextText;
+
+    // Recalculate heights when Diagram view is next shown.
+    delete measuredBoxHeightsById[id];
+    delete measuredItemHeightsById[id];
+
+    // Updates both the Outline and one Undo history entry.
+    updateAllViews();
+  } else {
+    // Cancel, or unchanged text: no history entry.
+    renderDiagramOutline();
+  }
+
+  // Restore keyboard focus to the same Edit button.
+  var buttons = document.querySelectorAll(
+    "#diagramOutlineTree .diagram-outline-edit-button"
+  );
+
+  Array.from(buttons).some(function (button) {
+    if (button.dataset.outlineNodeId === id) {
+      button.focus();
+      return true;
+    }
+    return false;
+  });
+}
+
+function buildOutlineTextEditor(node) {
+  var editor = document.createElement("div");
+  editor.className = "diagram-outline-editor";
+
+  var label = document.createElement("label");
+  label.htmlFor = "diagramOutlineEditInput";
+  label.textContent =
+    (activeOutlineTextEdit.isNew ? "Add " : "Edit ") +
+    getLevelLabel(node.level) + " text";
+
+  editor.appendChild(label);
+
+  var input = document.createElement("textarea");
+  input.id = "diagramOutlineEditInput";
+  input.rows = 3;
+  input.value = activeOutlineTextEdit.draft;
+
+  input.addEventListener("input", function () {
+    if (activeOutlineTextEdit) {
+      activeOutlineTextEdit.draft = input.value;
+    }
+
+    var error =
+      document.getElementById("diagramOutlineEditError");
+
+    if (error) error.textContent = "";
+  });
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      finishOutlineTextEdit(false);
+
+    } else if (
+      event.key === "Enter" &&
+      (event.ctrlKey || event.metaKey)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      finishOutlineTextEdit(true);
+    }
+  });
+
+  editor.appendChild(input);
+
+  var feedback = document.createElement("p");
+  feedback.id = "diagramOutlineEditError";
+  feedback.setAttribute("role", "alert");
+  editor.appendChild(feedback);
+
+  var actions = document.createElement("div");
+  actions.className = "diagram-outline-editor-actions";
+
+  var cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.className = "secondary";
+
+  cancel.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    finishOutlineTextEdit(false);
+  });
+
+  var confirm = document.createElement("button");
+  confirm.type = "button";
+  confirm.textContent = "Save";
+
+  confirm.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    finishOutlineTextEdit(true);
+  });
+
+  actions.appendChild(cancel);
+  actions.appendChild(confirm);
+  editor.appendChild(actions);
+
+  return editor;
+}
+
+
+/* B4.4d.2–4 — Reuse existing editors from a compact Outline Actions menu. */
+
+function outlineActionCanStart() {
+  if (
+    activeDiagramTextEdit ||
+    activeOutlineTextEdit ||
+    document.querySelector(
+      "dialog[open], .diagram-measure-editor-overlay"
+    )
+  ) {
+    alert("Save or cancel the current edit first.");
+    return false;
+  }
+  return true;
+}
+
+function buildOutlineActionControls(node) {
+  var group = document.createElement("span");
+  group.className = "diagram-outline-action-group";
+
+  var trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "diagram-outline-edit-button";
+  trigger.textContent = "Actions ▾";
+  trigger.setAttribute("aria-label", "Actions for " + node.text);
+  trigger.setAttribute("aria-expanded", "false");
+
+  var menu = document.createElement("span");
+  menu.className = "diagram-outline-action-menu";
+  menu.hidden = true;
+
+  function closeMenu() {
+    menu.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+  }
+
+  trigger.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!outlineActionCanStart()) return;
+
+    var opening = menu.hidden;
+
+    document.querySelectorAll(
+      "#diagramOutlineTree .diagram-outline-action-menu"
+    ).forEach(function (other) {
+      other.hidden = true;
+    });
+
+    document.querySelectorAll(
+      "#diagramOutlineTree .diagram-outline-action-group > button"
+    ).forEach(function (button) {
+      button.setAttribute("aria-expanded", "false");
+    });
+
+    menu.hidden = !opening;
+    trigger.setAttribute("aria-expanded", opening ? "true" : "false");
+  });
+
+  // Don't expand/collapse the enclosing Outline branch.
+  group.addEventListener("click", function (event) {
+    event.stopPropagation();
+  });
+
+  group.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && !menu.hidden) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+      trigger.focus();
+    }
+  });
+
+  group.addEventListener("focusout", function (event) {
+    if (!group.contains(event.relatedTarget)) closeMenu();
+  });
+
+  function actionButton(text, action, className) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.textContent = text;
+    if (className) button.className = className;
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!outlineActionCanStart()) return;
+      closeMenu();
+      action();
+    });
+
+    menu.appendChild(button);
+  }
+
+
+  // B4.4d.5 — Only show movement options when applicable.
+  var siblings = getSiblingIdsInOrder(node);
+  var siblingPosition = siblings.indexOf(node.id);
+
+  if (siblingPosition > 0) {
+    actionButton("Move up", function () {
+      moveOutlineSibling(node.id, "up");
+    });
+  }
+
+  if (
+    siblingPosition >= 0 &&
+    siblingPosition < siblings.length - 1
+  ) {
+    actionButton("Move down", function () {
+      moveOutlineSibling(node.id, "down");
+    });
+  }
+
+  actionButton("+ Add measure", function () {
+    addMeasureToNode(node.id);
+  });
+
+
+
+  // Saved colour choices, using the same flow as the diagram palette.
+  var colourDetails = document.createElement("details");
+  colourDetails.className = "diagram-outline-colour-details";
+
+  var colourSummary = document.createElement("summary");
+  colourSummary.textContent = "Change colour";
+  colourDetails.appendChild(colourSummary);
+
+  var colourChoices = document.createElement("div");
+  colourChoices.className = "diagram-outline-colour-choices";
+
+  function addOutlineColourChoice(label, colour, isNew) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "diagram-outline-colour-choice";
+
+    if (!isNew && colour) {
+      var swatch = document.createElement("span");
+      swatch.className = "diagram-outline-colour-swatch";
+      swatch.style.backgroundColor = colour;
+      swatch.setAttribute("aria-hidden", "true");
+      button.appendChild(swatch);
+    }
+
+    var text = document.createElement("span");
+    text.textContent = label;
+    button.appendChild(text);
+
+    if (!isNew && (node.color || "").toLowerCase() ===
+        (colour || "").toLowerCase()) {
+      var tick = document.createElement("span");
+      tick.className = "diagram-outline-colour-current";
+      tick.textContent = "✓";
+      tick.setAttribute("aria-hidden", "true");
+      button.appendChild(tick);
+      button.setAttribute("aria-pressed", "true");
+    } else if (!isNew) {
+      button.setAttribute("aria-pressed", "false");
+    }
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!outlineActionCanStart()) return;
+      closeMenu();
+
+      if (isNew) {
+        openQuickColourDialogForNode(node.id);
+      } else if ((node.color || "").toLowerCase() !==
+                 (colour || "").toLowerCase()) {
+        node.color = colour;
+        updateAllViews();
+      }
+    });
+
+    colourChoices.appendChild(button);
+  }
+
+  addOutlineColourChoice("No colour", "", false);
+
+  colorOptions.forEach(function (colour) {
+    addOutlineColourChoice(
+      colour.label + " (" + colour.value + ")",
+      colour.value,
+      false
+    );
+  });
+
+  var colourDivider = document.createElement("div");
+  colourDivider.className = "quick-colour-menu-divider";
+  colourChoices.appendChild(colourDivider);
+
+  addOutlineColourChoice("Add a colour…", null, true);
+
+  colourDetails.appendChild(colourChoices);
+  menu.appendChild(colourDetails);
+
+
+
+  actionButton("Delete element…", function () {
+    // Existing confirmation also describes dependent elements.
+    deleteNode(node.id);
+  }, "diagram-outline-delete-action");
+
+  group.appendChild(trigger);
+  group.appendChild(menu);
+  return group;
+}
+
+
+/* B4.4d.5 — Reorder Outline siblings using the existing helper. */
+
+function moveOutlineSibling(nodeId, direction) {
+  if (diagramViewMode !== "outline" || !outlineActionCanStart()) {
+    return false;
+  }
+
+  var node = nodes.find(function (n) {
+    return String(n.id) === String(nodeId);
+  });
+
+  if (!node || (direction !== "up" && direction !== "down")) {
+    return false;
+  }
+
+  var siblings = getSiblingIdsInOrder(node);
+  var index = siblings.indexOf(node.id);
+
+  if (
+    index < 0 ||
+    (direction === "up" && index === 0) ||
+    (direction === "down" && index === siblings.length - 1)
+  ) {
+    return false;
+  }
+
+  // Existing helper protects parent groups and creates one Undo step.
+  moveNodeWithinSiblings(node.id, direction);
+
+  // Announce the move to assistive technology.
+  var status = document.getElementById("diagramOutlineStatus");
+
+  if (status) {
+    status.textContent =
+      "Moved " + node.text + " " + direction +
+      " within its parent group.";
+  }
+
+  // Restore keyboard focus after the Outline redraw.
+  var editButtons = document.querySelectorAll(
+    '#diagramOutlineTree .diagram-outline-edit-button' +
+    '[data-outline-node-id]'
+  );
+
+  Array.from(editButtons).some(function (button) {
+    if (button.dataset.outlineNodeId !== String(node.id)) {
+      return false;
+    }
+
+    var trigger = button.parentElement.querySelector(
+      ".diagram-outline-action-group > button"
+    );
+
+    if (trigger) trigger.focus();
+
+    return !!trigger;
+  });
+
+  return true;
+}
+
+function renderDiagramOutline() {
+
+
+  var host = document.getElementById("diagramOutlineTree");
+  if (!host) return;
+
+  host.replaceChildren();
+
+  var lookup = Object.create(null);
+  var children = Object.create(null);
+  var visited = Object.create(null);
+
+  nodes.forEach(function (node) {
+    lookup[String(node.id)] = node;
+    children[String(node.id)] = [];
+  });
+
+  nodes.forEach(function (node) {
+    var parentId = String(node.parentId || "");
+
+    if (
+      parentId &&
+      lookup[parentId] &&
+      parentId !== String(node.id)
+    ) {
+      children[parentId].push(node);
+    }
+  });
+
+  function addNode(node, list) {
+    var id = String(node.id);
+    if (visited[id]) return;
+    visited[id] = true;
+
+    var li = document.createElement("li");
+    var row = document.createElement("span");
+    row.className = "diagram-outline-row";
+
+    var tag = document.createElement("span");
+    tag.className =
+      "diagram-outline-type diagram-outline-" + node.level;
+
+    tag.textContent = ({
+      aim: "Aim",
+      primary: "Primary",
+      secondary: "Secondary",
+      change: "Change idea"
+    })[node.level] || node.level;
+
+    row.appendChild(tag);
+
+    if (node.color) {
+      var swatch = document.createElement("span");
+      swatch.className = "diagram-outline-swatch";
+      swatch.style.backgroundColor = node.color;
+      swatch.setAttribute(
+        "aria-label", "Element colour " + node.color
+      );
+      row.appendChild(swatch);
+    }
+
+    // B4.4b: Click the text to find this element in Diagram view.
+    var label = document.createElement("button");
+    label.type = "button";
+    label.className =
+      "diagram-outline-text diagram-outline-locate";
+
+    label.textContent = node.text || "(Untitled element)";
+    label.title = "Find this element in the diagram";
+
+    label.setAttribute(
+      "aria-label",
+      "Find in diagram: " + label.textContent
+    );
+
+    label.addEventListener("click", function (event) {
+      // Prevent the parent <summary> from expanding or collapsing.
+      event.preventDefault();
+      event.stopPropagation();
+
+      locateDiagramNodeFromOutline(node.id);
+    });
+
+    row.appendChild(label);
+
+    // B4.4c — Edit the text without leaving Outline view.
+    var editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "diagram-outline-edit-button";
+    editButton.textContent = "Edit";
+    editButton.dataset.outlineNodeId = id;
+
+    editButton.setAttribute(
+      "aria-label",
+      "Edit text: " + label.textContent
+    );
+
+    editButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      beginOutlineTextEdit(id);
+    });
+
+
+    row.appendChild(editButton);
+
+    // B4.4d.1 — Only the first three levels can have children.
+    var nextLevel = getNextLevel(node.level);
+
+    if (nextLevel) {
+      var addButton = document.createElement("button");
+      addButton.type = "button";
+
+      // Reuse the existing Edit button's compact styling.
+      addButton.className =
+        "diagram-outline-edit-button diagram-outline-add-button";
+
+      addButton.textContent = "+ Add child";
+      addButton.dataset.outlineParentId = id;
+      addButton.title = "Add " + getLevelLabel(nextLevel);
+
+      addButton.setAttribute(
+        "aria-label",
+        "Add " + getLevelLabel(nextLevel) + " under " + node.text
+      );
+
+      addButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        beginOutlineChildEdit(id);
+      });
+
+      row.appendChild(addButton);
+    }
+
+    // B4.4d.2–4: Compact, direct editing actions.
+    row.appendChild(buildOutlineActionControls(node));
+
+    // Show additional relationships without duplicating nodes.
+    var extraCount = connections.filter(function (link) {
+      return String(link.toId) === id &&
+        String(link.fromId) !== String(node.parentId || "");
+    }).length;
+
+    if (extraCount) {
+      var extra = document.createElement("span");
+      extra.className = "diagram-outline-extra";
+      extra.textContent =
+        "+" + extraCount + " extra connection" +
+        (extraCount === 1 ? "" : "s");
+      row.appendChild(extra);
+    }
+
+    var childNodes = children[id] || [];
+    var measures = Array.isArray(node.measures)
+      ? node.measures : [];
+
+    var addingChildHere = !!(
+      activeOutlineTextEdit &&
+      activeOutlineTextEdit.isNew &&
+      activeOutlineTextEdit.parentId === id
+    );
+
+    if (childNodes.length || measures.length || addingChildHere) {
+      var details = document.createElement("details");
+
+      details.open =
+        Object.prototype.hasOwnProperty.call(
+          diagramOutlineOpenById, id
+        )
+          ? diagramOutlineOpenById[id]
+          : node.level === "aim";
+
+      var summary = document.createElement("summary");
+      summary.appendChild(row);
+      details.appendChild(summary);
+
+      var childList = document.createElement("ul");
+
+
+      // Measures stay with their own element and keep their order.
+      measures.forEach(function (measure, measureIndex) {
+        var measureRow = document.createElement("li");
+        measureRow.className = "diagram-outline-measure";
+
+        var meta = getMeasureTypeMeta(
+          measure && measure.type
+        );
+
+        var bullet = document.createElement("span");
+        bullet.textContent = "●";
+        bullet.style.color = meta.color;
+        bullet.setAttribute("aria-label", meta.label);
+        measureRow.appendChild(bullet);
+
+        var text = document.createElement("span");
+        text.className = "diagram-outline-measure-text";
+        text.textContent = typeof measure === "string"
+          ? measure
+          : (measure && measure.text) || "(Untitled measure)";
+
+        var editMeasureButton = document.createElement("button");
+        editMeasureButton.type = "button";
+        editMeasureButton.className = "diagram-outline-measure-edit";
+        editMeasureButton.textContent = "Edit";
+        editMeasureButton.title = "Edit or delete this measure";
+        editMeasureButton.setAttribute(
+          "aria-label", "Edit or delete measure: " + text.textContent
+        );
+
+        editMeasureButton.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!outlineActionCanStart()) return;
+          editMeasureOnNode(node.id, measureIndex);
+        });
+
+        measureRow.appendChild(text);
+        measureRow.appendChild(editMeasureButton);
+        childList.appendChild(measureRow);
+      });
+
+
+            childNodes.forEach(function (child) {
+        addNode(child, childList);
+      });
+
+      if (addingChildHere) {
+        var draftItem = document.createElement("li");
+        draftItem.className = "diagram-outline-draft-item";
+
+        draftItem.appendChild(
+          buildOutlineTextEditor({
+            level: activeOutlineTextEdit.level
+          })
+        );
+
+        childList.appendChild(draftItem);
+        details.open = true;
+      }
+
+      details.appendChild(childList);
+
+      details.addEventListener("toggle", function () {
+        diagramOutlineOpenById[id] = details.open;
+      });
+
+      li.appendChild(details);
+
+    } else {
+      var leaf = document.createElement("div");
+      leaf.className = "diagram-outline-leaf";
+      leaf.appendChild(row);
+      li.appendChild(leaf);
+    }
+
+    // B4.4c — Place an active editor beneath its element.
+    if (
+      activeOutlineTextEdit &&
+      activeOutlineTextEdit.id === id
+    ) {
+      var editor = buildOutlineTextEditor(node);
+
+      var branch = li.querySelector(":scope > details");
+
+      if (branch) {
+        // Keep this branch open while editing.
+        branch.open = true;
+
+        var childList =
+          branch.querySelector(":scope > ul");
+
+        branch.insertBefore(editor, childList);
+      } else {
+        // Change ideas and other leaf elements.
+        li.appendChild(editor);
+      }
+    }
+
+    list.appendChild(li);
+  }
+
+  // Start with aims and any unconnected elements.
+  nodes.forEach(function (node) {
+    var parentId = String(node.parentId || "");
+
+    if (
+      !parentId ||
+      !lookup[parentId] ||
+      parentId === String(node.id)
+    ) {
+      addNode(node, host);
+    }
+  });
+
+  // Include anything remaining from unusual older diagrams.
+  nodes.forEach(function (node) {
+    addNode(node, host);
+  });
+}
+
+
+/* B4.4b — Navigate from Outline to an existing diagram box. */
+
+function locateDiagramNodeFromOutline(nodeId) {
+  var id = String(nodeId);
+
+  // Never navigate to an element that no longer exists.
+  var exists = nodes.some(function (node) {
+    return String(node.id) === id;
+  });
+
+  if (!exists) return;
+
+  // Restore the visual diagram first.
+  if (diagramViewMode === "outline") {
+    switchDiagramView("diagram");
+  }
+
+  // Respect any existing safeguard that prevented switching.
+  if (diagramViewMode !== "diagram") return;
+
+  // Use the existing selection logic, but avoid toggling
+  // off a box that is already selected.
+  if (selectedDiagramNodeId !== id) {
+    selectDiagramNode(id);
+  }
+
+  // Wait until the diagram has had time to become visible
+  // and complete its layout after switching views.
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+
+      var boxes = document.querySelectorAll(
+        "#diagramColumns .diagram-node"
+      );
+
+      var target = Array.from(boxes).find(function (box) {
+        return box.getAttribute("data-id") === id;
+      });
+
+      if (!target) return;
+
+      // Focus the chosen element for keyboard users.
+      // Prevent focus itself from causing an unwanted scroll.
+      try {
+        target.focus({ preventScroll: true });
+      } catch (error) {
+        target.focus();
+      }
+
+      // Bring the selected box into the visible area.
+      target.scrollIntoView({
+        behavior: window.matchMedia &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto" : "smooth",
+        block: "center",
+        inline: "center"
+      });
+
+    });
+  });
+}
+
+function switchDiagramView(view) {
+
+  if (view !== "diagram" && view !== "outline") return;
+  if (view === diagramViewMode) return;
+
+  // Do not interrupt an unfinished edit.
+    if (
+    activeDiagramTextEdit ||
+    activeOutlineTextEdit ||
+    document.querySelector(
+      "dialog[open], .diagram-measure-editor-overlay"
+    )
+  ) {
+    alert(
+      "Please save or cancel the current edit before switching views."
+    );
+    return;
+  }
+
+  var exportArea = document.getElementById("exportArea");
+  var outline = document.getElementById("diagramOutlineView");
+  var area = document.getElementById("diagramArea");
+  var diagramButton = document.getElementById("btnViewDiagram");
+  var outlineButton = document.getElementById("btnViewOutline");
+
+  if (!exportArea || !outline) return;
+
+  closeNodeContextMenu();
+  closeMeasureContextMenu();
+
+  diagramViewMode = view;
+
+  // Clear visual selections without changing the diagram.
+  selectedDiagramNodeId = null;
+  selectedDiagramMeasure = null;
+  selectedDiagramConnection = null;
+
+  exportArea.hidden = view === "outline";
+  outline.hidden = view !== "outline";
+
+  if (area) {
+    area.classList.toggle(
+      "is-outline-view", view === "outline"
+    );
+  }
+
+  if (diagramButton) {
+    diagramButton.setAttribute(
+      "aria-pressed", view === "diagram"
+    );
+  }
+
+  if (outlineButton) {
+    outlineButton.setAttribute(
+      "aria-pressed", view === "outline"
+    );
+  }
+
+  updateDiagramSelectionBar();
+  updateDiagramConnectionBar();
+
+  if (view === "outline") {
+    renderDiagramOutline();
+
+  } else {
+    // Recalculate dimensions now the diagram is visible.
+    measuredBoxHeightsById = {};
+    measuredItemHeightsById = {};
+    suppressAutosizeRelayout = false;
+
+    renderDiagram();
+  }
+}
+
+function initialiseDiagramViewSwitch() {
+  var diagramButton = document.getElementById("btnViewDiagram");
+  var outlineButton = document.getElementById("btnViewOutline");
+  var exportArea = document.getElementById("exportArea");
+  var outline = document.getElementById("diagramOutlineView");
+  var area = document.getElementById("diagramArea");
+
+  if (
+    !diagramButton || !outlineButton ||
+    !exportArea || !outline
+  ) return;
+
+  // Saved HTML copies also reopen in Diagram view.
+  diagramViewMode = "diagram";
+  exportArea.hidden = false;
+  outline.hidden = true;
+
+  if (area) area.classList.remove("is-outline-view");
+
+  diagramButton.setAttribute("aria-pressed", "true");
+  outlineButton.setAttribute("aria-pressed", "false");
+
+  diagramButton.addEventListener("click", function () {
+    switchDiagramView("diagram");
+  });
+
+  outlineButton.addEventListener("click", function () {
+    switchDiagramView("outline");
   });
 }
 
 /* ---------- View toggles & export ---------- */
 
+
 function toggleControlsVisibility() {
   var panel = document.getElementById("controlsPanel");
   var btn = document.getElementById("btnToggleControls");
-  var layout = document.querySelector("main"); // the 2-column grid
+  var layout = document.querySelector("main");
   if (!panel || !btn || !layout) return;
 
   controlsVisible = !controlsVisible;
   panel.style.display = controlsVisible ? "" : "none";
-  btn.textContent = controlsVisible ? "Hide editing panel" : "Show editing panel";
+  layout.classList.toggle("sidebar-collapsed", !controlsVisible);
 
-  // When controls are hidden, make the diagram take full width;
-  // when shown, revert to the original 2-column layout.
-  if (controlsVisible) {
-    layout.style.gridTemplateColumns = ""; // fall back to CSS (two columns)
-  } else {
-    layout.style.gridTemplateColumns = "minmax(0, 1fr)"; // single column
-  }
+  var label = controlsVisible ? "Hide editing panel" : "Show editing panel";
+  btn.setAttribute("aria-label", label);
+  btn.title = label;
+  btn.setAttribute("aria-expanded", controlsVisible ? "true" : "false");
 
-  // Recalculate node positions and redraw connection lines after layout change
+  // The icon stays in the sidebar dock, even when the panel is hidden.
+  // CSS handles full-width and narrow-screen layouts.
   if (window.requestAnimationFrame) {
     window.requestAnimationFrame(updateAllViews);
   } else {
@@ -3160,191 +6708,83 @@ function toggleControlsVisibility() {
 }
 
 
-// Helper: temporarily replace the live SVG with an <img> snapshot
-// so html2canvas / html2pdf capture lines reliably.
-
-function withSvgImageOverlay(runCapture) {
-  var exportArea = document.getElementById("exportArea");
-  var svg = document.getElementById("diagramConnections");
-  var canvasDiv = document.getElementById("diagramCanvas");
-  if (!exportArea || !svg || !canvasDiv) {
-    // Fallback: run capture directly
-    return runCapture();
-  }
-
-  // Make sure positions + connections are up to date
-  updateAllViews();
-
-  var serializer;
-  try {
-    serializer = new XMLSerializer();
-  } catch (e) {
-    console.error("XMLSerializer not available, capturing directly.", e);
-    return runCapture();
-  }
-
-  var svgClone = svg.cloneNode(true);
-  var svgString = serializer.serializeToString(svgClone);
-  var dataUrl =
-    "data:image/svg+xml;charset=utf-8," +
-    encodeURIComponent(svgString);
-
-  return new Promise(function (resolve, reject) {
-    var img = new Image();
-    img.onload = function () {
-      // Hide original SVG and overlay the image in the same spot
-      svg.style.visibility = "hidden";
-      img.style.position = "absolute";
-      img.style.top = "0";
-      img.style.left = "0";
-      img.style.width = "100%";
-      img.style.height = "100%";
-      img.style.pointerEvents = "none";
-
-      canvasDiv.appendChild(img);
-
-      var p;
-      try {
-        p = runCapture();
-      } catch (err) {
-        cleanup();
-        reject(err);
-        return;
-      }
-
-      function cleanup() {
-        try {
-          canvasDiv.removeChild(img);
-        } catch (e) {}
-        svg.style.visibility = "";
-      }
-
-      if (p && typeof p.then === "function") {
-        p.then(function (result) {
-          cleanup();
-          resolve(result);
-        }).catch(function (err) {
-          cleanup();
-          reject(err);
-        });
-      } else {
-        cleanup();
-        resolve(p);
-      }
-    };
-
-    img.onerror = function (err) {
-      console.error("SVG image overlay failed, capturing directly.", err);
-      // Fallback: run capture without overlay
-      try {
-        var p2 = runCapture();
-        if (p2 && typeof p2.then === "function") {
-          p2.then(resolve).catch(reject);
-        } else {
-          resolve(p2);
-        }
-      } catch (e2) {
-        reject(e2);
-      }
-    };
-
-    img.src = dataUrl;
-  });
-}
-
-
-
-function exportDiagramPng() {
-  var exportArea = document.getElementById("exportArea");
-  if (!exportArea) {
-    alert("Could not find diagram to export.");
-    return;
-  }
-
-  // Hide badges + add/connect buttons for export
-  exportArea.classList.add("export-clean");
-
-  withSvgImageOverlay(function () {
-    // Return the html2canvas promise so the helper can clean up afterwards
-    return html2canvas(exportArea, {
-      scale: 2,
-      useCORS: true,
-      logging: false
-    });
-  })
-    .then(function (canvas) {
-      exportArea.classList.remove("export-clean");
-      if (!canvas) return;
-
-      canvas.toBlob(function (blob) {
-        if (!blob) return;
-        var url = URL.createObjectURL(blob);
-        var link = document.createElement("a");
-        link.href = url;
-        link.download = "driver-diagram.png";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      });
-    })
-    .catch(function (err) {
-      console.error("PNG export error:", err);
-      exportArea.classList.remove("export-clean");
-    });
-}
-
-
-
-function exportDiagramPdf() {
-  var exportArea = document.getElementById("exportArea");
-  if (!exportArea) {
-    alert("Could not find diagram to export.");
-    return;
-  }
-
-  var opt = {
-    margin: 10,
-    filename: "driver-diagram.pdf",
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
-  };
-
-  exportArea.classList.add("export-clean");
-
-  withSvgImageOverlay(function () {
-    // html2pdf returns a Promise
-    return html2pdf().set(opt).from(exportArea).save();
-  })
-    .then(function () {
-      exportArea.classList.remove("export-clean");
-    })
-    .catch(function (err) {
-      console.error("PDF export error:", err);
-      exportArea.classList.remove("export-clean");
-    });
-}
-
-
+/* Export chart: vector PDF / SVG / PNG implemented below in this file.
+   No html2canvas or jsPDF pipeline is used. */
 
 function updateLegendVisibility() {
-    var legend = document.getElementById("legendContainer");
-    var btn = document.getElementById("toggleLegendBtn");
+  var legend = document.getElementById("legendContainer");
+  var btn = document.getElementById("toggleLegendBtn");
+  if (!legend || !btn) return;
 
-    if (legendVisible) {
-        legend.style.display = "block";
-        btn.textContent = "Hide key";
-    } else {
-        legend.style.display = "none";
-        btn.textContent = "Show key";
-    }
+  legend.style.display = legendVisible ? "block" : "none";
+  var label = legendVisible ? "Hide key" : "Show key";
+  btn.title = label;
+  btn.setAttribute("aria-label", label);
+  btn.setAttribute("aria-pressed", legendVisible ? "true" : "false");
 }
 
+
 /* ---------- Help / info modal ---------- */
+
+/* B4.3b — Convert Help topics into expandable sections. */
+
+function initialiseHelpAccordions() {
+  var dialog = document.querySelector("#helpOverlay .modal-dialog");
+
+  // Do not build the sections more than once.
+  if (!dialog || dialog.querySelector(".help-accordion")) return;
+
+  // Find the existing Help headings.
+  var headings = Array.from(dialog.children).filter(function (element) {
+    return element.classList.contains("faq-question") ||
+      element.tagName === "H3";
+  });
+
+  headings.forEach(function (heading) {
+
+    var details = document.createElement("details");
+    details.className = "help-accordion";
+
+    // Keep only one Help section expanded at a time.
+    details.setAttribute("name", "driver-help");
+
+    var summary = document.createElement("summary");
+    summary.textContent = heading.textContent.trim();
+
+    var content = document.createElement("div");
+    content.className = "help-accordion-content";
+
+    dialog.insertBefore(details, heading);
+    details.appendChild(summary);
+    details.appendChild(content);
+
+    // Move the existing content into its expandable section.
+    // Preserve all paragraphs, lists and links.
+    var current = heading.nextSibling;
+
+    while (current) {
+      if (current.nodeType === 1 && (
+        current.classList.contains("faq-question") ||
+        current.tagName === "H3"
+      )) {
+        break;
+      }
+
+      var next = current.nextSibling;
+      content.appendChild(current);
+      current = next;
+    }
+
+    heading.remove();
+  });
+}
 
 function openHelpOverlay() {
   var overlay = document.getElementById("helpOverlay");
   if (!overlay) return;
+
+  // Prepare the expandable sections on first opening.
+  initialiseHelpAccordions();
   overlay.classList.add("is-open");
   overlay.setAttribute("aria-hidden", "false");
 }
@@ -3354,6 +6794,460 @@ function closeHelpOverlay() {
   if (!overlay) return;
   overlay.classList.remove("is-open");
   overlay.setAttribute("aria-hidden", "true");
+}
+
+
+
+/* B4.2b — Colour choices while editing element text. */
+
+var closeInlineColourMenu = null;
+
+function dismissInlineColourMenu() {
+  if (closeInlineColourMenu) closeInlineColourMenu();
+}
+
+function previewInlineColour(nodeId, colour, newOption) {
+  if (!activeDiagramTextEdit ||
+      activeDiagramTextEdit.id !== nodeId) return;
+
+  // Stage the colour until the edit is confirmed.
+  activeDiagramTextEdit.pendingColour = colour;
+  activeDiagramTextEdit.pendingColourOption = newOption || null;
+
+  var field = document.getElementById("diagramInlineText");
+  var box = field && field.closest(".diagram-node");
+  if (!box) return;
+
+  box.style.backgroundColor = colour || "#ffffff";
+  box.style.borderColor = colour ? "#999" : "#d0d7de";
+  box.style.color = colour
+    ? getContrastingTextColor(colour)
+    : "#000000";
+}
+
+
+function showInlineColourMenu(nodeId, trigger) {
+  if (!activeDiagramTextEdit ||
+      activeDiagramTextEdit.id !== nodeId) return;
+
+  dismissInlineColourMenu();
+
+  var menu = document.createElement("div");
+  menu.className = "diagram-inline-colour-menu";
+  menu.setAttribute("role", "group");
+  menu.setAttribute("aria-label", "Change box colour");
+
+  var node = nodes.find(function (n) { return n.id === nodeId; });
+  var currentColour = Object.prototype.hasOwnProperty.call(
+    activeDiagramTextEdit, "pendingColour"
+  ) ? activeDiagramTextEdit.pendingColour : (node ? node.color : "");
+  currentColour = (currentColour || "").toLowerCase();
+
+  function closeMenu() {
+    menu.remove();
+    document.removeEventListener("pointerdown", outsideClick, true);
+    document.removeEventListener("keydown", escapeKey, true);
+    window.removeEventListener("resize", closeMenu);
+    window.removeEventListener("scroll", scrollOutside, true);
+    if (closeInlineColourMenu === closeMenu) closeInlineColourMenu = null;
+  }
+
+  function outsideClick(event) {
+    if (!menu.contains(event.target) && !trigger.contains(event.target)) {
+      closeMenu();
+    }
+  }
+
+  function scrollOutside(event) {
+    if (!menu.contains(event.target)) closeMenu();
+  }
+
+  function escapeKey(event) {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeMenu();
+    if (trigger.isConnected) trigger.focus();
+  }
+
+  function addChoice(label, colour, action) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "diagram-inline-colour-choice";
+
+    if (colour !== null) {
+      button.setAttribute("aria-pressed",
+        String((colour || "").toLowerCase() === currentColour));
+    }
+
+    if (colour) {
+      var swatch = document.createElement("span");
+      swatch.className = "diagram-inline-colour-swatch";
+      swatch.style.backgroundColor = colour;
+      button.appendChild(swatch);
+    }
+
+    var text = document.createElement("span");
+    text.textContent = label;
+    text.style.minWidth = "0";
+    text.style.overflowWrap = "anywhere";
+    button.appendChild(text);
+
+    if (colour !== null && (colour || "").toLowerCase() === currentColour) {
+      var tick = document.createElement("span");
+      tick.textContent = "✓";
+      tick.style.marginLeft = "auto";
+      tick.setAttribute("aria-hidden", "true");
+      button.appendChild(tick);
+    }
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+      action();
+      if (colour !== null && trigger.isConnected) trigger.focus();
+    });
+    menu.appendChild(button);
+  }
+
+  // Remove the element's colour.
+  addChoice("No colour", "", function () {
+    previewInlineColour(nodeId, "", null);
+  });
+
+  // Show only colours already saved in the key.
+  if (!colorOptions.length) {
+    var empty = document.createElement("div");
+    empty.className = "colour-options-empty";
+    empty.textContent = "No colours added yet.";
+    menu.appendChild(empty);
+  } else {
+    colorOptions.forEach(function (option) {
+      addChoice(option.label + " (" + option.value + ")", option.value,
+        function () { previewInlineColour(nodeId, option.value, null); });
+    });
+  }
+
+  // Separate existing colours from the Add colour action.
+  var divider = document.createElement("div");
+  divider.className = "quick-colour-menu-divider";
+  menu.appendChild(divider);
+
+  // Open the existing shared 24-colour popup.
+  addChoice("Add a colour…", null, function () {
+    openQuickColourDialogForNode(nodeId);
+  });
+
+  // Position the menu near the palette button.
+  document.body.appendChild(menu);
+  var rect = trigger.getBoundingClientRect();
+  var left = Math.max(8,
+    Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8));
+  var top = rect.bottom + 6;
+
+  if (top + menu.offsetHeight > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - menu.offsetHeight - 6);
+  }
+
+  menu.style.left = left + "px";
+  menu.style.top = top + "px";
+
+  // Close on outside click, Escape, resize or external scroll.
+  closeInlineColourMenu = closeMenu;
+  document.addEventListener("pointerdown", outsideClick, true);
+  document.addEventListener("keydown", escapeKey, true);
+  window.addEventListener("resize", closeMenu);
+  window.addEventListener("scroll", scrollOutside, true);
+}
+
+/* B5.5b — 24 standard colours for the visual element picker. */
+var standardDiagramColours = [
+  { label: "NHS Dark Blue", value: "#003087" },
+  { label: "NHS Blue", value: "#005EB8" },
+  { label: "NHS Aqua Green", value: "#00A499" },
+  { label: "NHS Purple", value: "#330072" },
+  { label: "NHS Pink", value: "#AE2573" },
+  { label: "NHS Dark Grey", value: "#425563" },
+
+  { label: "NHS Bright Blue", value: "#0072CE" },
+  { label: "NHS Light Blue", value: "#41B6E6" },
+  { label: "NHS Green", value: "#009639" },
+  { label: "NHS Orange", value: "#ED8B00" },
+  { label: "NHS Warm Yellow", value: "#FFB81C" },
+  { label: "NHS Mid Grey", value: "#768692" },
+
+  { label: "Soft Pink", value: "#FBDADA" },
+  { label: "Soft Orange", value: "#FFD285" },
+  { label: "Soft Yellow", value: "#FFFB8F" },
+  { label: "Soft Green", value: "#A6FF94" },
+  { label: "Soft Blue", value: "#D9E8F5" },
+  { label: "Soft Aqua", value: "#D9F1EF" },
+
+  { label: "White", value: "#FFFFFF" },
+  { label: "Off White", value: "#F8F9FA" },
+  { label: "Cool Slate", value: "#F0F4F5" },
+  { label: "NHS Pale Grey", value: "#E8EDEE" },
+  { label: "Soft Grey", value: "#AEB7BD" },
+  { label: "NHS Charcoal", value: "#212B32" }
+];
+
+
+
+
+
+/* Unified popup for adding, applying and editing named colours. */
+function openQuickColourDialogForNode(nodeId, options) {
+  options = options || {};
+  var fromSidebar = nodeId == null;
+  var editOption = options.editValue
+    ? findColorOptionByValue(options.editValue) : null;
+  var editingExisting = !!editOption;
+  var originalValue = editingExisting ? editOption.value : null;
+  var originalLabel = editingExisting ? editOption.label : null;
+
+  var targetNode = fromSidebar ? null : nodes.find(function (n) {
+    return n.id === nodeId;
+  });
+  if ((!fromSidebar && !targetNode) ||
+      document.getElementById("quickColourDialog")) return;
+
+  var dialog = document.createElement("dialog");
+  dialog.id = "quickColourDialog";
+  dialog.className = "quick-colour-dialog";
+  dialog.setAttribute("aria-labelledby", "quickColourTitle");
+
+  dialog.innerHTML =
+    '<form id="quickColourForm" novalidate>' +
+      '<div class="quick-colour-header">' +
+        '<h2 id="quickColourTitle">Add a colour</h2>' +
+        '<button type="button" id="quickColourClose" class="quick-colour-close" ' +
+          'aria-label="Close colour picker">×</button>' +
+      '</div>' +
+      '<p id="quickColourTarget" class="quick-colour-target" hidden></p>' +
+      '<label class="quick-colour-field-label" id="quickColourGridLabel">Choose a colour</label>' +
+      '<div id="quickColourGrid" class="quick-colour-grid" ' +
+        'role="group" aria-labelledby="quickColourGridLabel"></div>' +
+      '<div class="quick-colour-selection-row">' +
+        '<details class="quick-colour-custom" id="quickColourCustom">' +
+          '<summary>Custom colour…</summary>' +
+          '<label for="quickColourValue">Choose your own colour</label>' +
+          '<input id="quickColourValue" type="color">' +
+        '</details>' +
+        '<span class="quick-colour-current">' +
+          '<span id="quickColourPreview" class="quick-colour-preview"></span>' +
+          '<span id="quickColourSelected">Select a colour</span>' +
+        '</span>' +
+      '</div>' +
+      '<label for="quickColourName" class="quick-colour-field-label">Colour name</label>' +
+      '<input id="quickColourName" type="text" maxlength="80" ' +
+        'placeholder="e.g. Workforce workstream" autocomplete="off" required>' +
+      '<p id="quickColourError" class="quick-colour-error" role="alert"></p>' +
+      '<div class="quick-colour-actions">' +
+        '<button type="button" class="secondary quick-colour-remove" ' +
+          'id="quickColourRemove" hidden>Remove colour</button>' +
+        '<button type="button" class="secondary" ' +
+          'id="quickColourCancel">Cancel</button>' +
+        '<button type="submit" id="quickColourSave" disabled>Add colour</button>' +
+      '</div>' +
+    '</form>';
+
+  var grid = dialog.querySelector("#quickColourGrid");
+  var nameInput = dialog.querySelector("#quickColourName");
+  var colourInput = dialog.querySelector("#quickColourValue");
+  var errorText = dialog.querySelector("#quickColourError");
+  var selectedText = dialog.querySelector("#quickColourSelected");
+  var preview = dialog.querySelector("#quickColourPreview");
+  var saveButton = dialog.querySelector("#quickColourSave");
+  var removeButton = dialog.querySelector("#quickColourRemove");
+  var selectedColour = editingExisting ? editOption.value.toLowerCase() : null;
+
+  if (editingExisting) {
+    dialog.querySelector("#quickColourTitle").textContent = "Edit colour";
+    saveButton.textContent = "Save changes";
+    nameInput.value = editOption.label;
+  } else if (!fromSidebar) {
+    // Show the current box colour (or an unsaved inline preview), if present.
+    var current = targetNode.color || "";
+    if (activeDiagramTextEdit && activeDiagramTextEdit.id === nodeId &&
+        Object.prototype.hasOwnProperty.call(activeDiagramTextEdit, "pendingColour")) {
+      current = activeDiagramTextEdit.pendingColour || "";
+    }
+    selectedColour = current ? current.toLowerCase() : null;
+    var known = findColorOptionByValue(selectedColour);
+    if (known) nameInput.value = known.label;
+    removeButton.hidden = false;
+    var target = dialog.querySelector("#quickColourTarget");
+    target.hidden = false;
+    target.textContent = "Box: " + targetNode.text;
+  }
+
+  function refreshSelection() {
+    var isValid = selectedColour && /^#[0-9a-f]{6}$/.test(selectedColour);
+    if (isValid) {
+      colourInput.value = selectedColour;
+      preview.style.backgroundColor = selectedColour;
+      selectedText.textContent = selectedColour.toUpperCase();
+    } else {
+      preview.style.backgroundColor = "#ffffff";
+      selectedText.textContent = "Select a colour";
+    }
+
+    grid.querySelectorAll(".quick-colour-tile").forEach(function (tile) {
+      tile.setAttribute("aria-pressed",
+        tile.dataset.colour.toLowerCase() === selectedColour ? "true" : "false");
+    });
+
+    var name = nameInput.value.trim();
+    var unchanged = editingExisting &&
+      selectedColour === originalValue.toLowerCase() &&
+      name === originalLabel;
+    saveButton.disabled = !isValid || !name || unchanged;
+    errorText.textContent = "";
+  }
+
+  function chooseColour(value, preserveName) {
+    selectedColour = String(value || "").toLowerCase();
+    if (!editingExisting && !preserveName) {
+      var matching = findColorOptionByValue(selectedColour);
+      nameInput.value = matching ? matching.label : "";
+    }
+    refreshSelection();
+  }
+
+  standardDiagramColours.forEach(function (preset) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "quick-colour-tile";
+    button.dataset.colour = preset.value;
+    button.setAttribute("aria-pressed", "false");
+    button.setAttribute("aria-label", preset.label + ", " + preset.value);
+    button.title = preset.value + " (" + preset.label + ")";
+
+    var swatch = document.createElement("span");
+    swatch.className = "quick-colour-tile-swatch";
+    swatch.style.backgroundColor = preset.value;
+    swatch.setAttribute("aria-hidden", "true");
+    button.appendChild(swatch);
+
+    button.addEventListener("click", function () {
+      chooseColour(preset.value, false);
+      nameInput.focus();
+    });
+    grid.appendChild(button);
+  });
+
+  // Browser-native custom colour picker; the name field stays visible.
+  colourInput.value = selectedColour || defaultNewColorValue;
+  colourInput.addEventListener("input", function () {
+    chooseColour(colourInput.value, true);
+  });
+  colourInput.addEventListener("change", function () {
+    chooseColour(colourInput.value, true);
+  });
+  nameInput.addEventListener("input", refreshSelection);
+
+  function closeDialog() { dialog.close(); }
+  dialog.querySelector("#quickColourCancel").addEventListener("click", closeDialog);
+  dialog.querySelector("#quickColourClose").addEventListener("click", closeDialog);
+
+  removeButton.addEventListener("click", function () {
+    if (fromSidebar) return;
+    if (activeDiagramTextEdit && activeDiagramTextEdit.id === nodeId) {
+      previewInlineColour(nodeId, "", null);
+    } else {
+      var node = nodes.find(function (n) { return n.id === nodeId; });
+      if (node) {
+        node.color = "";
+        updateAllViews();
+      }
+    }
+    closeDialog();
+  });
+
+  dialog.querySelector("#quickColourForm").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var colour = (selectedColour || "").toLowerCase();
+    var label = nameInput.value.trim();
+    if (!/^#[0-9a-f]{6}$/.test(colour)) {
+      errorText.textContent = "Choose a colour first.";
+      return;
+    }
+    if (!label) {
+      errorText.textContent = "Enter a name for the colour.";
+      nameInput.focus();
+      return;
+    }
+
+    var matching = findColorOptionByValue(colour);
+    if (editingExisting) {
+      if (matching && matching !== editOption) {
+        errorText.textContent = 'Already saved as "' + matching.label +
+          '". Choose a different colour.';
+        return;
+      }
+      // A renamed or recoloured key entry updates every box that uses it.
+      editOption.label = label;
+      editOption.value = colour;
+      nodes.forEach(function (node) {
+        if ((node.color || "").toLowerCase() === originalValue.toLowerCase()) {
+          node.color = colour;
+        }
+      });
+      if (activeDiagramTextEdit &&
+          (activeDiagramTextEdit.pendingColour || "").toLowerCase() ===
+            originalValue.toLowerCase()) {
+        activeDiagramTextEdit.pendingColour = colour;
+      }
+      updateAllViews();
+      setColorEditorStatus('Colour "' + label + '" updated.', "success");
+    } else {
+      var currentNode = fromSidebar ? null : nodes.find(function (n) {
+        return n.id === nodeId;
+      });
+      if (!fromSidebar && !currentNode) {
+        errorText.textContent = "This element is no longer available.";
+        return;
+      }
+
+      // An existing hex value reuses its single named key entry.
+      var optionToCommit = matching && matching.label === label
+        ? null : { label: label, value: colour };
+
+      if (!fromSidebar && activeDiagramTextEdit &&
+          activeDiagramTextEdit.id === nodeId) {
+        // Commit the colour and its name only when the box's tick is clicked.
+        previewInlineColour(nodeId, colour, optionToCommit);
+      } else {
+        if (matching) {
+          matching.label = label;
+        } else {
+          colorOptions.push({ label: label, value: colour });
+        }
+        if (currentNode) currentNode.color = colour;
+        updateAllViews();
+        setColorEditorStatus('Colour "' + label + '" added.', "success");
+      }
+    }
+    closeDialog();
+  });
+
+  dialog.addEventListener("close", function () {
+    dialog.remove();
+    if (activeDiagramTextEdit && activeDiagramTextEdit.id === nodeId) {
+      var field = document.getElementById("diagramInlineText");
+      if (field) field.focus();
+    }
+  });
+
+  document.body.appendChild(dialog);
+  refreshSelection();
+  dialog.showModal();
+  if (editingExisting) nameInput.focus();
+  else {
+    var first = grid.querySelector("button");
+    if (first) first.focus();
+  }
 }
 
 function ensureNodeContextMenu() {
@@ -3561,41 +7455,13 @@ addSimpleSubmenu("Measures", function (addSubItem) {
 
   var hasMeasures = !!(n && n.measures && n.measures.length);
 
-  addSubItem("Edit measure…", function () {
-    var list = n.measures.map(function (m, i) {
-      return (i + 1) + ") " + (m.text || "");
-    }).join("\n");
-
-    var pick = window.prompt("Enter the measure number to edit:\n\n" + list, "1");
-    if (pick === null) return;
-
-    var idx = parseInt(pick, 10) - 1;
-    if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
-      alert("That number is not valid.");
-      return;
-    }
-
-    editMeasureOnNode(id, idx);
-    closeNodeContextMenu();
-  }, !hasMeasures);
-
-  addSubItem("Delete measure…", function () {
-    var list = n.measures.map(function (m, i) {
-      return (i + 1) + ") " + (m.text || "");
-    }).join("\n");
-
-    var pick = window.prompt("Enter the measure number to delete:\n\n" + list, "1");
-    if (pick === null) return;
-
-    var idx = parseInt(pick, 10) - 1;
-    if (!isFinite(idx) || idx < 0 || idx >= n.measures.length) {
-      alert("That number is not valid.");
-      return;
-    }
-
-    deleteMeasureOnNode(id, idx);
-    closeNodeContextMenu();
-  }, !hasMeasures);
+  if (hasMeasures) {
+  addSubItem(
+    "Double-click a measure to edit; right-click for actions.",
+    null,
+    true
+  );
+}
 
   addSubItem("Clear all measures…", function () {
     clearMeasuresFromNode(id);
@@ -3718,6 +7584,20 @@ function addColorSubmenu(label) {
       closeNodeContextMenu();
     });
 
+
+    function addNewColourMenuItem() {
+      var separator = document.createElement("div");
+      separator.className = "quick-colour-menu-divider";
+      sub.appendChild(separator);
+
+      addSubItem("Add a colour…", function () {
+        var targetId = n.id;
+        closeNodeContextMenu();
+        openQuickColourDialogForNode(targetId);
+      });
+    }
+
+
     var hr = document.createElement("div");
     hr.style.height = "1px";
     hr.style.background = "#eaeef2";
@@ -3731,6 +7611,7 @@ function addColorSubmenu(label) {
       msg.style.color = "#6b7280";
       msg.style.userSelect = "none";
       sub.appendChild(msg);
+      addNewColourMenuItem();
       return;
     }
 
@@ -3772,8 +7653,10 @@ function addColorSubmenu(label) {
         closeNodeContextMenu();
       });
 
-      sub.appendChild(btn);
+            sub.appendChild(btn);
     });
+
+    addNewColourMenuItem();
   }
 
   function positionSubmenu() {
@@ -3879,7 +7762,405 @@ function closeNodeContextMenu() {
 
 /* ---------- Init ---------- */
 
+
+/* B5.3b — Local-only, editable AI prompt builder. */
+function createAiDriverDiagramPrompt(options) {
+  var scenarios = {
+    draft: {
+      heading: "Create an initial draft",
+      purpose: "Use the supplied project documents and context to propose a deliberately provisional driver diagram. It should be recognisable to the group but not appear agreed or finished. Expect substantial discussion and revision.",
+      task: "Identify the stated aim, existing understanding and any ideas the group has already discussed. Organise them into a concise theory of change. Distinguish material drawn from sources from your own suggestions."
+    },
+    synthesis: {
+      heading: "Synthesise existing team thinking",
+      purpose: "Translate an improvement group's engagement findings, fishbone diagram, workshop outputs or other existing understanding into a proposed driver diagram. Faithfully represent the group's thinking, including disagreement.",
+      task: "A fishbone identifies possible causes; a driver diagram expresses what needs to be in place for improvement. Interpret the findings accordingly rather than just renaming fishbone branches. Do not invent agreement or evidence."
+    },
+    explore: {
+      heading: "Explore possible approaches",
+      purpose: "Explore a complex improvement objective to illustrate plausible drivers, possible changes, uncertainties and people who should be engaged. This is NOT an agreed plan or a recommendation to implement interventions.",
+      task: "Where reliable information is available, distinguish it from inference and speculation. Identify stakeholders, dependencies, trade-offs and important missing local information. Do not fabricate citations or claim to have reviewed sources you cannot access."
+    }
+  };
+
+  var wording = {
+    preserve: "Preserve the terminology and language style of the supplied material. Only suggest wording changes separately.",
+    clarify: "Suggest clearer wording where it helps, while retaining the original meaning. Make substantial rewording visible for review.",
+    alternatives: "Offer alternative wording for discussion; do not imply the group has adopted your alternatives."
+  };
+  var measures = {
+    none: "Do not generate measures. Leave measures_json blank in the CSV.",
+    existing: "Include only measures already identified in the source material, and ask which the group wants retained. Do not add new measures.",
+    few: "Propose a very small, selective set of measures, clearly labelled as suggestions for discussion. Ask the user to confirm which to include."
+  };
+  var changes = {
+    existing: "Include only change ideas actually identified in the supplied material. Do not invent additional interventions.",
+    none: "Do not include change ideas at this stage. It is acceptable for the diagram to stop at secondary drivers.",
+    suggest: "Offer a limited number of possible change ideas separately from the group's existing ideas. Ask which, if any, to include."
+  };
+  var colours = {
+    app: "Leave colour values blank. Presentation formatting will be chosen in the Driver Diagram Tool.",
+    branch: "If the user confirms this scheme, assign an accessible six-digit hex colour to each primary driver and its descendants; leave the Aim uncoloured unless asked.",
+    level: "If the user confirms this scheme, assign one accessible six-digit hex colour per level: Aim, primary, secondary and change.",
+    custom: "Before generating CSV, ask the user which six-digit hex colours they want. Do not guess the palette."
+  };
+  var scenario = scenarios[options.scenario] || scenarios.draft;
+
+  return [
+    "AI-ASSISTED DRIVER DIAGRAM — " + scenario.heading,
+    "",
+    "YOUR ROLE AND PURPOSE",
+    scenario.purpose,
+    scenario.task,
+    "This diagram must ultimately reflect the improvement team's own beliefs about how improvement will happen. AI cannot determine that consensus or validate the team's theory of change.",
+    "",
+    "INFORMATION GOVERNANCE",
+    "Do not ask me to paste patient-identifiable, staff-identifiable, other personal or confidential information into an AI service unless its use has been specifically authorised by my organisation for this information and task. Removing names alone may not remove identifiability. If approval is uncertain, prompt me to consult local information-governance guidance first.",
+    "",
+    "WORK WITH ME IN STAGES — DO NOT RUSH AHEAD",
+    "1. Ask what source material and context I can appropriately share using my organisation-approved AI environment. Do not invent details that are absent.",
+    "2. Summarise your understanding, then ask a maximum of three material clarification questions at a time. STOP and wait for my answers. Do not answer your own questions, and do not repeat information already supplied.",
+    "3. Produce a readable, concise draft hierarchy (Aim, primary drivers, secondary drivers, and change ideas only if requested). Distinguish source-derived content from AI suggestions, and highlight important gaps, assumptions, disagreements and missing perspectives outside the diagram.",
+
+    "4. Invite me to review, correct and refine the wording, relationships and scope. Do not treat a plausible diagram as an agreed improvement plan. At the END of every draft or revised draft, ask: 'Would you like to refine the diagram further, or generate an importable CSV from the current draft?' Then STOP and wait for my choice.",
+    "5. If I choose to generate/export CSV, or say 'Generate the CSV now' or equivalent, treat that as my explicit request. Immediately output the CSV in your NEXT response using the contract below. Do not reopen general discussion or ask another review question, unless one essential detail would make the CSV invalid. If I choose refinement, help revise and then offer the same two choices again.",
+    "",
+    "CONTENT PREFERENCES",
+    "Wording: " + (wording[options.wording] || wording.preserve),
+    "Measures: " + (measures[options.measures] || measures.none),
+    "Change ideas: " + (changes[options.changes] || changes.existing),
+    "Colour formatting: " + (colours[options.colours] || colours.app),
+    "Keep the number of drivers and changes manageable. Avoid bland or generic management language. A polished-looking diagram is not evidence of validity.",
+    "",
+    "CSV OUTPUT CONTRACT (ONLY WHEN I REQUEST CSV)",
+        "Return only one fenced csv code block.",
+    "By default, use exactly these four required columns, in this order:",
+    "id,level,parent_id,text",
+    "Only if colours, additional parent connections or measures are requested, use these seven columns instead:",
+    "id,level,parent_id,text,color,extra_parents,measures_json",
+    "Use exactly one aim row with a blank parent_id. Valid levels are aim, primary, secondary and change. Give each row a unique sequential numeric ID starting at 1. Each primary has the Aim as parent, each secondary has a primary as parent and each change has a secondary as parent.",
+    "Maintain the reviewed ordering and wording. No self-connections, missing parents or cycles. Use extra_parents only for genuine additional connections we have explicitly agreed; use semicolon-separated IDs.",
+    "CSV formatting is essential. Put double quotes around EVERY text field, even when it contains no commas. If the text contains quotation marks, escape them by doubling them. Never leave a comma inside an unquoted text field.",
+    "Every data row must contain exactly the same number of columns as the header: four for the basic format, or seven for the extended format. In the seven-column format, if all three optional fields are blank, include three trailing commas after the text field.",
+    "If measures are requested, encode measures_json as a JSON array of objects containing type and text. Permitted types: outcome, process, balancing and none. Escape JSON quotation marks correctly within CSV fields.",    "Do not include auto_size: the app enables automatic sizing by default. Do not introduce extra columns. Check the CSV against these rules before sending it.",
+    "",
+    "FIRST RESPONSE",
+    "Briefly explain what you need from me for this scenario. Ask up to three essential questions, then STOP and wait for my answers."
+  ].join("\n");
+}
+
+function initialiseAiPromptBuilder() {
+  var editor = document.getElementById("aiPromptEditor");
+  var makeButton = document.getElementById("aiBuildPrompt");
+  var resetButton = document.getElementById("aiResetPrompt");
+  var copyButton = document.getElementById("aiCopyPrompt");
+  var status = document.getElementById("aiPromptStatus");
+  var copyFeedback = document.getElementById("aiCopyFeedback");
+
+  if (!editor || !makeButton || !resetButton ||
+      !copyButton || !status || !copyFeedback) return;
+  var fields = {
+    scenario: document.getElementById("aiPromptScenario"),
+    wording: document.getElementById("aiPromptWording"),
+    measures: document.getElementById("aiPromptMeasures"),
+    changes: document.getElementById("aiPromptChanges"),
+    colours: document.getElementById("aiPromptColours")
+  };
+  if (Object.keys(fields).some(function (key) { return !fields[key]; })) return;
+
+  var lastGenerated = "";
+  function proposedText() {
+    var options = {};
+    Object.keys(fields).forEach(function (key) { options[key] = fields[key].value; });
+    return createAiDriverDiagramPrompt(options);
+  }
+  function setButtons() {
+    copyButton.disabled = !editor.value.trim();
+    resetButton.disabled = !lastGenerated;
+  }
+  function replacePrompt(confirmEdits) {
+    if (confirmEdits && editor.value.trim() && editor.value !== lastGenerated &&
+        !window.confirm("Replace your edited prompt with the recommended wording?")) {
+      return;
+    }
+    lastGenerated = proposedText();
+    editor.value = lastGenerated;
+    status.textContent = "Prompt created. Review and edit it before copying.";
+    setButtons();
+  }
+
+  makeButton.addEventListener("click", function () { replacePrompt(true); });
+  resetButton.addEventListener("click", function () { replacePrompt(true); });
+  editor.addEventListener("input", function () {
+    status.textContent = "Your edits are kept until you choose to replace them.";
+    setButtons();
+  });
+  Object.keys(fields).forEach(function (key) {
+    fields[key].addEventListener("change", function () {
+      status.textContent = editor.value.trim()
+        ? "Preferences changed. Select Create / update prompt to apply them; your text has not been overwritten."
+        : "Preferences ready. Select Create / update prompt.";
+    });
+  });
+
+  
+  // Display a visible confirmation beside Copy prompt.
+  var copyFeedbackTimer = null;
+
+  function reportCopy(success) {
+    if (copyFeedbackTimer) {
+      window.clearTimeout(copyFeedbackTimer);
+    }
+
+    copyFeedback.textContent = success
+      ? "✓ Copied to clipboard"
+      : "Copy blocked — select the text and copy manually";
+
+    copyFeedback.classList.toggle("is-error", !success);
+    copyFeedback.hidden = false;
+
+    status.textContent = success
+      ? "Prompt copied. Paste it only into an AI service authorised for your task and information."
+      : "Automatic copying was blocked. Select all the prompt text and copy it manually.";
+
+    copyFeedbackTimer = window.setTimeout(function () {
+      copyFeedback.hidden = true;
+      copyFeedback.textContent = "";
+    }, 5000);
+  }
+
+  function fallbackCopy() {
+    editor.focus();
+    editor.select();
+
+    var success = false;
+
+    try {
+      success = document.execCommand("copy");
+    } catch (error) {
+      success = false;
+    }
+
+    reportCopy(success);
+  }
+
+  copyButton.addEventListener("click", function () {
+    if (!editor.value.trim()) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(editor.value).then(function () {
+        reportCopy(true);
+      }).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+ 
+  });
+
+  // B5.3d.1 — Reset the AI wizard whenever its window closes.
+  var aiDialog = document.getElementById("aiGuidanceDialog");
+
+  if (aiDialog) {
+    aiDialog.addEventListener("close", function () {
+
+      // Restore all recommended preferences.
+      Object.keys(fields).forEach(function (key) {
+        fields[key].selectedIndex = 0;
+      });
+
+      // Clear the generated or edited prompt.
+      editor.value = "";
+      lastGenerated = "";
+      status.textContent = "";
+
+      // Clear any copy notification and its timer.
+      if (copyFeedbackTimer) {
+        window.clearTimeout(copyFeedbackTimer);
+        copyFeedbackTimer = null;
+      }
+
+      copyFeedback.hidden = true;
+      copyFeedback.textContent = "";
+      copyFeedback.classList.remove("is-error");
+
+      // Clear any pasted CSV and import messages.
+      var csvField = document.getElementById("aiCsvPasteInput");
+      var csvStatus = document.getElementById("aiCsvPasteStatus");
+
+      if (csvField) csvField.value = "";
+      if (csvStatus) csvStatus.textContent = "";
+
+      // Expand the IG warning again.
+      var warning = aiDialog.querySelector(".ai-ig-warning");
+      if (warning) warning.open = true;
+
+      // Collapse the explanatory scenario sections.
+      aiDialog.querySelectorAll(".ai-scenario").forEach(function (item) {
+        item.open = false;
+      });
+
+      // Start at the top of the window next time.
+      aiDialog.scrollTop = 0;
+
+      // Update the Copy and Restore button states.
+      setButtons();
+    });
+  }
+
+  setButtons();
+}
+
+
+/* B5.3c — Import CSV pasted from an AI chatbot. */
+
+function initialiseAiCsvPaste() {
+  var field = document.getElementById("aiCsvPasteInput");
+  var importButton = document.getElementById("aiImportPastedCsv");
+  var clearButton = document.getElementById("aiClearPastedCsv");
+  var status = document.getElementById("aiCsvPasteStatus");
+  var dialog = document.getElementById("aiGuidanceDialog");
+
+  if (!field || !importButton || !clearButton || !status) {
+    return;
+  }
+
+  // Clear pasted text without affecting the current diagram.
+  clearButton.addEventListener("click", function () {
+    field.value = "";
+    status.textContent = "CSV text cleared.";
+    field.focus();
+  });
+
+  importButton.addEventListener("click", function () {
+    var text = field.value.trim();
+
+    if (!text) {
+      status.textContent = "Paste the CSV from your chatbot first.";
+      field.focus();
+      return;
+    }
+
+    // Do not replace the diagram during an unfinished text edit.
+    if (activeDiagramTextEdit || activeOutlineTextEdit) {
+      status.textContent =
+        "Save or cancel your current diagram text edit before importing.";
+      return;
+    }
+
+    // Accept plain CSV or a fenced ```csv block.
+    var match = text.match(/```csv[ \t]*\r?\n([\s\S]*?)\r?\n```/i);
+
+    if (match) {
+      text = match[1].trim();
+    }
+
+    if (!text) {
+      status.textContent = "No CSV rows were found in the pasted text.";
+      return;
+    }
+
+    // Reuse the existing CSV validation and import process.
+    var file = new File(
+      [text],
+      "pasted-driver-diagram.csv",
+      { type: "text/csv" }
+    );
+
+    status.textContent = "Checking pasted CSV...";
+    importButton.disabled = true;
+
+    uploadCsv(file, function (ok) {
+      importButton.disabled = false;
+
+      if (!ok) {
+        status.textContent =
+          "CSV was not imported. The existing diagram is unchanged.";
+        return;
+      }
+
+      // Clear successful imports from the temporary paste area.
+      field.value = "";
+      status.textContent = "CSV imported successfully.";
+
+      // Close the AI window to reveal the imported diagram.
+      if (dialog && dialog.open) {
+        dialog.close();
+      }
+    });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+
+
+/* B4.1b.1 — Refresh lines after browser zoom or resizing. */
+
+var zoomRedrawTimer = null;
+
+function redrawLinesForViewport() {
+  var canvas = document.getElementById("diagramCanvas");
+  var svg = document.getElementById("diagramConnections");
+
+  if (canvas && svg) {
+    drawConnections(canvas, svg);
+  }
+}
+
+
+function redrawLinesAfterLayout() {
+  // Allow the browser to finish recalculating layout.
+  if (window.requestAnimationFrame) {
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        redrawLinesForViewport();
+      });
+    });
+  } else {
+    redrawLinesForViewport();
+  }
+}
+
+function scheduleViewportLineRedraw() {
+  clearTimeout(zoomRedrawTimer);
+
+  // Wait briefly for zoom or resizing to settle.
+  zoomRedrawTimer = setTimeout(function () {
+    redrawLinesAfterLayout();
+  }, 180);
+}
+
+
+// Standard browser zoom and window resizing.
+window.addEventListener("resize", function () {
+  scheduleViewportLineRedraw();
+});
+
+// Pinch zoom and visual viewport changes.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener(
+    "resize",
+    function () {
+      scheduleViewportLineRedraw(true);
+    }
+  );
+}
+
+// Also respond when the diagram itself changes size.
+if (window.ResizeObserver) {
+  var zoomLineObserver = new window.ResizeObserver(
+    function () {
+      scheduleViewportLineRedraw();
+    }
+  );
+
+  var diagramToObserve =
+    document.getElementById("diagramCanvas");
+
+  if (diagramToObserve) {
+    zoomLineObserver.observe(diagramToObserve);
+  }
+}
+
   console.log("Driver Diagram Tool loaded with header controls and export.");
 
   var addBtn = document.getElementById("addNodeBtn");
@@ -3887,19 +8168,223 @@ document.addEventListener("DOMContentLoaded", function () {
   var downloadBtn = document.getElementById("downloadCsvBtn");
   var uploadInput = document.getElementById("uploadCsvInput");
   var btnSavePortable = document.getElementById("btnSavePortable");
-  var addColorBtn =  document.getElementById("addColorBtn");
-  var cancelColorEditBtn =  document.getElementById("cancelColorEditBtn");
-  var colorLabelInput =  document.getElementById("colorLabelInput");
-  var colorValueInput =  document.getElementById("colorValueInput");
-
   var btnToggleControls = document.getElementById("btnToggleControls");
   var btnHeaderClear = document.getElementById("btnHeaderClear");
-  var btnExportPng = document.getElementById("btnExportPng");
-  var btnExportPdf = document.getElementById("btnExportPdf");
   var applyAppearanceBtn = document.getElementById("applyAppearanceBtn");
+
+
+/* B3.1 — Undo/Redo controls */
+
+var undoDiagramBtn =
+  document.getElementById("btnDiagramUndo");
+
+var redoDiagramBtn =
+  document.getElementById("btnDiagramRedo");
+
+if (undoDiagramBtn) {
+  undoDiagramBtn.addEventListener(
+    "click",
+    undoDiagramChange
+  );
+}
+
+if (redoDiagramBtn) {
+  redoDiagramBtn.addEventListener(
+    "click",
+    redoDiagramChange
+  );
+}
+
+// Keyboard shortcuts.
+document.addEventListener("keydown", function (e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) {
+    return;
+  }
+
+  // Leave native text-field undo/redo alone.
+  if (e.target && e.target.closest &&
+      e.target.closest(
+        'input, textarea, select, [contenteditable="true"]'
+      )) {
+    return;
+  }
+
+  var key = e.key.toLowerCase();
+
+  if (key === "z" && !e.shiftKey) {
+    e.preventDefault();
+    undoDiagramChange();
+  } else if (
+    (key === "z" && e.shiftKey) ||
+    key === "y"
+  ) {
+    e.preventDefault();
+    redoDiagramChange();
+  }
+});
+
+
+  /* B5.3a.1 — AI guidance modal: move and connect existing guidance. */
+  var aiPanel = document.getElementById("aiAssistancePanel");
+  var aiDialog = document.getElementById("aiGuidanceDialog");
+  var aiContent = document.getElementById("aiGuidanceContent");
+  var aiTrigger = document.getElementById("btnAiGuidance");
+  var aiClose = document.getElementById("btnCloseAiGuidance");
+
+  if (aiPanel && aiDialog && aiContent && aiTrigger && aiClose) {
+    // The actual guidance content is retained; no duplicate text or warning.
+    aiContent.appendChild(aiPanel);
+    aiPanel.open = true;
+
+    aiTrigger.addEventListener("click", function () {
+      if (!aiDialog.open) {
+        aiDialog.showModal();
+        aiClose.focus();
+      }
+    });
+
+    aiClose.addEventListener("click", function () {
+      aiDialog.close();
+    });
+
+    // Also handles Escape, which closes a native <dialog>.
+    aiDialog.addEventListener("close", function () {
+      aiTrigger.focus();
+    });
+
+    // Optional click on the dark backdrop closes the window.
+    aiDialog.addEventListener("click", function (event) {
+      if (event.target !== aiDialog) return;
+      var rect = aiDialog.getBoundingClientRect();
+      if (event.clientX < rect.left ||
+          event.clientX > rect.right ||
+          event.clientY < rect.top ||
+          event.clientY > rect.bottom) {
+        aiDialog.close();
+      }
+    });
+  }
+
+  initialiseAiPromptBuilder();
+  initialiseAiCsvPaste();
+
   var btnHelp = document.getElementById("btnHelp");
   var helpOverlay = document.getElementById("helpOverlay");
   var helpCloseBtn = document.getElementById("helpCloseBtn");
+
+
+// B1.2: Selection bar buttons
+
+var editTextBtn = document.getElementById("diagramEditTextBtn");
+var saveTextBtn = document.getElementById("diagramSaveTextBtn");
+var cancelTextBtn = document.getElementById("diagramCancelTextBtn");
+
+if (editTextBtn) {
+  editTextBtn.addEventListener("click", function () {
+    if (selectedDiagramNodeId) {
+      editNode(selectedDiagramNodeId);
+    }
+  });
+}
+
+if (saveTextBtn) {
+  saveTextBtn.addEventListener(
+    "click",
+    saveDiagramInlineText
+  );
+}
+
+if (cancelTextBtn) {
+  cancelTextBtn.addEventListener(
+    "click",
+    cancelDiagramInlineText
+  );
+}
+
+
+/* B2.2 — Click-away and Escape for measures */
+
+document.addEventListener("click", function (e) {
+  if (activeDiagramTextEdit) return;
+
+  // Don't clear selection while a modal editor is open.
+  if (document.querySelector(
+    "dialog[open], .diagram-measure-editor-overlay"
+  )) return;
+
+  if (e.target.closest(
+    ".diagram-measure-row, " +
+    ".diagram-measure-context-menu, " +
+    ".diagram-measure-editor-overlay"
+  )) return;
+
+  closeMeasureContextMenu();
+
+  if (selectedDiagramMeasure) {
+    clearSelectedDiagramMeasure();
+  }
+});
+
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape") return;
+  if (activeDiagramTextEdit) return;
+
+  // Let an open editor handle Escape first.
+  if (document.querySelector(
+    "dialog[open], .diagram-measure-editor-overlay"
+  )) return;
+
+  closeMeasureContextMenu();
+
+  if (selectedDiagramMeasure) {
+    clearSelectedDiagramMeasure();
+  }
+});
+
+document.addEventListener(
+  "scroll", closeMeasureContextMenu, true
+);
+
+window.addEventListener(
+  "resize", closeMeasureContextMenu
+);
+
+
+/* B1.5: Deselect when clicking blank diagram space */
+
+var diagramClickSurface =
+  document.getElementById("diagramCanvasWrapper");
+
+if (diagramClickSurface) {
+  diagramClickSurface.addEventListener("click", function (e) {
+
+    // Never discard text that is being edited.
+    if (activeDiagramTextEdit) return;
+
+    // Do not deselect when clicking a diagram item
+    // or an editable column heading.
+    if (e.target.closest(
+      ".diagram-item, .diagram-column-title"
+    )) {
+      return;
+    }
+
+    // Nothing to deselect.
+    if (selectedDiagramNodeId === null) return;
+
+    // Clear the selection without redrawing the diagram.
+    selectedDiagramNodeId = null;
+
+    document.querySelectorAll(
+      ".diagram-node.diagram-selected"
+    ).forEach(function (box) {
+      box.classList.remove("diagram-selected");
+    });
+
+    updateDiagramSelectionBar();
+  });
+}
+
 
 var exportArea = document.getElementById("exportArea");
 if (exportArea) {
@@ -3924,43 +8409,6 @@ if (exportArea) {
     });
   }
   
-if (addColorBtn) {
-  addColorBtn.addEventListener(
-    "click",
-    addColorOptionFromForm
-  );
-}
-
-if (cancelColorEditBtn) {
-  cancelColorEditBtn.addEventListener(
-    "click",
-    cancelColorEdit
-  );
-}
-
-if (colorLabelInput) {
-  colorLabelInput.addEventListener(
-    "input",
-    handleColorEditorInput
-  );
-}
-
-if (colorValueInput) {
-  colorValueInput.addEventListener(
-    "input",
-    handleColorEditorInput
-  );
-
-  /*
-    Some browsers report colour-picker changes using
-    the change event rather than input.
-  */
-  colorValueInput.addEventListener(
-    "change",
-    handleColorEditorInput
-  );
-}
-
   if (btnToggleControls) {
     btnToggleControls.addEventListener("click", toggleControlsVisibility);
   }
@@ -3968,15 +8416,132 @@ if (colorValueInput) {
   if (btnHeaderClear) {
     btnHeaderClear.addEventListener("click", clearAllNodes);
   }
-  if (btnExportPng) {
-    btnExportPng.addEventListener("click", exportDiagramPng);
-  }
-  if (btnExportPdf) {
-    btnExportPdf.addEventListener("click", exportDiagramPdf);
-  }
   if (applyAppearanceBtn) {
     applyAppearanceBtn.addEventListener("click", applyDiagramAppearanceFromInputs);
   }
+
+
+
+/* B3.3 — Individual connection formatting controls */
+
+var connectionFormatSelect =
+  document.getElementById("connectionFormatSelect");
+
+var connectionFormatClear =
+  document.getElementById("connectionFormatClear");
+
+if (connectionFormatSelect) {
+  connectionFormatSelect.addEventListener("change", function () {
+    if (!selectedDiagramConnection) return;
+
+    var conn = findDiagramConnection(
+      selectedDiagramConnection.fromId,
+      selectedDiagramConnection.toId
+    );
+
+    if (!conn) return;
+
+    var style = connectionFormatSelect.value === "default"
+      ? ""
+      : normaliseConnectionOverride(connectionFormatSelect.value);
+
+    if (style) {
+      conn.style = style;
+    } else {
+      delete conn.style;
+    }
+
+    // One history entry for this formatting change.
+    recordDiagramHistory();
+
+    var canvas = document.getElementById("diagramCanvas");
+    var svg = document.getElementById("diagramConnections");
+
+    if (canvas && svg) drawConnections(canvas, svg);
+    updateDiagramConnectionBar();
+  });
+}
+
+
+/* B3.3a: Visual connection-style choices */
+
+document.querySelectorAll(
+  "#connectionFormatBar [data-connection-style]"
+).forEach(function (button) {
+
+  button.addEventListener("click", function (event) {
+    event.stopPropagation();
+
+    var select = document.getElementById(
+      "connectionFormatSelect"
+    );
+
+    if (!select || !selectedDiagramConnection) return;
+
+    select.value = button.getAttribute(
+      "data-connection-style"
+    );
+
+    // Reuse the existing B3.3 style-change logic.
+    select.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+  });
+
+});
+
+
+if (connectionFormatClear) {
+  connectionFormatClear.addEventListener(
+    "click", clearDiagramConnectionSelection
+  );
+}
+
+document.addEventListener("click", function (e) {
+  if (activeDiagramTextEdit) return;
+
+  if (e.target.closest(
+    "#connectionFormatBar, .diagram-connection-hit"
+  )) return;
+
+  clearDiagramConnectionSelection();
+});
+
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape" || activeDiagramTextEdit) return;
+
+  if (document.querySelector(
+    "dialog[open], .diagram-measure-editor-overlay"
+  )) return;
+
+  clearDiagramConnectionSelection();
+});
+
+
+
+/* B2.5: Live connection style preview */
+
+var connectionStyleInput =
+  document.getElementById("connectionStyleInput");
+
+if (connectionStyleInput) {
+  connectionStyleInput.addEventListener("change", function () {
+
+    diagramAppearance.connectionStyle =
+      normaliseConnectionStyle(connectionStyleInput.value);
+
+recordDiagramHistory();
+
+    var canvas = document.getElementById("diagramCanvas");
+    var svg = document.getElementById("diagramConnections");
+
+    // Redraw lines without rebuilding the diagram boxes.
+    if (canvas && svg) {
+      drawConnections(canvas, svg);
+    }
+  });
+}
+
 
  // Help / info modal
   if (btnHelp) {
@@ -4010,12 +8575,16 @@ if (colorValueInput) {
     btnToggleLegend.addEventListener("click", function () {
       legendVisible = !legendVisible;
       updateLegendVisibility();
+      recordDiagramHistory();
     });
   }
 
 
   // Set up collapsible sections in controls panel
   setupCollapsibleSections();
+
+  // B4.4a.1: Set up view buttons before loading diagram data.
+  initialiseDiagramViewSwitch();
 
 /*
   A portable HTML file contains embedded project data.
@@ -4041,7 +8610,570 @@ if (loadedEmbeddedProject) {
   setAppearanceInputsFromConfig();
 }
 
+
 initialiseColorEditor();
 ensureNodeContextMenu();
 
+// B3.1: The initial diagram is our first history state.
+// This runs after normal or portable-HTML project loading.
+initialiseDiagramHistory();
+
 });
+
+/* ---------- Reliable vector export subsystem ---------- */
+
+/*
+ * Driver Diagram Tool — production vector exports (PDF, SVG and PNG)
+ * Standalone browser implementation; included automatically in saved HTML.
+ * Based on validated P0 Phase 3.2 exporter with A3/A2/A1 print options.
+ */
+(function () {
+  "use strict";
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function notify(message) {
+    window.alert(message);
+  }
+
+  function editingBlocked(action) {
+    if (typeof window.blockFileActionDuringEdit === "function") {
+      return window.blockFileActionDuringEdit(action);
+    }
+    if (window.activeDiagramTextEdit || window.activeOutlineTextEdit) {
+      notify("Save or cancel your current edit before " + action + ".");
+      return true;
+    }
+    return false;
+  }
+
+  function afterTwoFrames(callback) {
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(callback);
+    });
+  }
+
+  function getReadyDiagram(callback) {
+    // Exporting from Outline should not unexpectedly leave the user in Diagram.
+    var restoreOutline = window.diagramViewMode === "outline" &&
+      typeof window.switchDiagramView === "function";
+    if (restoreOutline) window.switchDiagramView("diagram");
+    afterTwoFrames(function () {
+      var area = document.getElementById("exportArea");
+      var canvas = document.getElementById("diagramCanvas");
+      var connections = document.getElementById("diagramConnections");
+      try {
+        if (!area || !canvas || !connections || !area.getBoundingClientRect().width) {
+          throw new Error("The diagram could not be located for this export test.");
+        }
+        callback(area, canvas, connections);
+      } finally {
+        if (restoreOutline) window.switchDiagramView("outline");
+      }
+    });
+  }
+
+  // Full content bounds, including wide canvases on mobile and measures below
+  // absolutely positioned boxes. A simple getBoundingClientRect() can undercount.
+  function getExportBounds(area) {
+    var outer = area.getBoundingClientRect();
+    var canvas = area.querySelector("#diagramCanvas");
+    var width = Math.max(outer.width, area.scrollWidth,
+      canvas ? canvas.scrollWidth : 0);
+    var height = Math.max(outer.height, area.scrollHeight);
+    area.querySelectorAll(
+      ".diagram-item, .diagram-measure-row, .diagram-column-title, #legendContainer"
+    ).forEach(function (el) {
+      if (el.closest("#legendContainer") &&
+          getComputedStyle(el.closest("#legendContainer")).display === "none") return;
+      var b = el.getBoundingClientRect();
+      if (b.width && b.height) {
+        width = Math.max(width, b.right - outer.left + 3);
+        height = Math.max(height, b.bottom - outer.top + 3);
+      }
+    });
+    return {rect:outer,width:Math.ceil(width),height:Math.ceil(height)};
+  }
+
+  function copyStylesForPrint() {
+    var base = document.createElement("base");
+    base.href = document.baseURI;
+    var styles = Array.from(document.head.querySelectorAll(
+      'style, link[rel="stylesheet"]'
+    )).map(function (el) { return el.outerHTML; }).join("\n");
+    return base.outerHTML + "\n" + styles;
+  }
+
+  function cleanCloneForPrint(area) {
+    var clone = area.cloneNode(true);
+    clone.classList.add("export-clean");
+    clone.removeAttribute("hidden");
+    clone.querySelectorAll(".diagram-connection-hit").forEach(function (el) {
+      el.remove();
+    });
+    clone.querySelectorAll(".diagram-connection-visible").forEach(function (path) {
+      path.setAttribute("stroke", "#666");
+      path.setAttribute("stroke-width", "2.5");
+      path.removeAttribute("data-selected");
+    });
+    // Keep only the static, user-visible export area; don't run application JS.
+    return clone;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>\"']/g, function (m) {
+      return {"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[m];
+    });
+  }
+
+  // Physical ISO A-series landscape paper dimensions, in millimetres.
+  // Preserve print-area margins for bleed-safe professional copies.
+  var PAPER_SIZES = {
+    A3: {width:420, height:297},
+    A2: {width:594, height:420},
+    A1: {width:841, height:594}
+  };
+  var PRINT_MARGIN_MM = 5;
+  // 7 pt is a diagnostic minimum, not an accessibility conformance claim.
+  var MIN_MEASURE_PT = 7;
+
+  function getPdfFit(size, widthPx, heightPx, measurePx) {
+    var sheet = PAPER_SIZES[size];
+    var fitWidth = (sheet.width - PRINT_MARGIN_MM*2) * 96 / 25.4;
+    var fitHeight = (sheet.height - PRINT_MARGIN_MM*2) * 96 / 25.4;
+    var scale = Math.min(fitWidth/widthPx, fitHeight/heightPx);
+    return {
+      scale:scale,
+      shownWidth:Math.ceil(widthPx*scale),
+      shownHeight:Math.ceil(heightPx*scale),
+      measurePt:measurePx*scale*0.75
+    };
+  }
+
+  function printPreview() {
+    if (editingBlocked("preparing the vector PDF")) return;
+
+    // Open synchronously, before requestAnimationFrame, to avoid popup blockers.
+    var preview = window.open("", "_blank", "width=1100,height=850");
+    if (!preview) {
+      notify("Please allow pop-ups for this tool, then try 'Test vector PDF' again.");
+      return;
+    }
+    preview.document.write("<!doctype html><title>Preparing driver diagram…</title><p>Preparing print preview…</p>");
+    preview.document.close();
+
+    getReadyDiagram(function (area) {
+      if (preview.closed) return;
+      try {
+        var full = getExportBounds(area);
+        var fullWidth = full.width;
+        var fullHeight = full.height;
+        var colElement = area.querySelector("#diagramColumns");
+        var liveColumnGap = colElement ? getComputedStyle(colElement).columnGap : "3.5rem";
+
+        // Use smallest actually rendered measure font rather than just the first.
+        var measureSizes = Array.from(area.querySelectorAll(
+          ".diagram-measure-row > span:last-child"
+        )).map(function (el) {
+          return parseFloat(window.getComputedStyle(el).fontSize);
+        }).filter(function (n) { return Number.isFinite(n) && n>0; });
+        var measurePx = measureSizes.length ? Math.min.apply(null,measureSizes) : 10;
+        var fit = {};
+        Object.keys(PAPER_SIZES).forEach(function (size) {
+          fit[size] = getPdfFit(size,fullWidth,fullHeight,measurePx);
+        });
+        var recommended = Object.keys(PAPER_SIZES).find(function (size) {
+          return fit[size].measurePt >= MIN_MEASURE_PT;
+        }) || "A1";
+        var noSizeMeetsTarget = fit.A1.measurePt < MIN_MEASURE_PT;
+        var clone = cleanCloneForPrint(area);
+        clone.style.setProperty("width",fullWidth+"px","important");
+        clone.style.setProperty("max-width","none","important");
+
+        var css = [
+          "* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }",
+          "html,body { margin:0 !important; padding:0 !important; background:#fff !important; }",
+          "#p0-actions { box-sizing:border-box; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px; font:14px sans-serif; background:#f1f5f9; color:#1e293b; }",
+          "#p0-actions button,#p0-actions select { font:inherit; border:1px solid #94a3b8; background:white; color:#111; padding:6px 10px; cursor:pointer; border-radius:5px; }",
+          "#p0-actions label { display:inline-flex; align-items:center; gap:7px; font-size:13px; margin:0; }",
+          "#p0-actions select { width:auto !important; margin:0 !important; }",
+          "#p0-actions p { margin:0; flex:1 1 100%; font-size:12px; line-height:1.4; }",
+          "#p0-actions p.p0-warning { color:#992116; font-weight:650; }",
+          "#p0-actions p.p0-good { color:#14532d; }",
+          "#p0-page { position:relative; width:"+fit.A3.shownWidth+"px; height:"+fit.A3.shownHeight+"px; margin:8px auto; overflow:visible; }",
+          "#exportArea { position:absolute !important; top:0; left:0; box-sizing:border-box; width:"+fullWidth+"px !important; max-width:none !important; zoom:"+fit.A3.scale.toFixed(8)+"; transform:none !important; }",
+          "#exportArea #diagramCanvasWrapper { overflow:visible !important; }",
+          "#exportArea #diagramColumns { column-gap:"+liveColumnGap+" !important; }",
+          "#exportArea .diagram-add,#exportArea .diagram-quick-add-measure,#exportArea .diagram-edit-pencil,#exportArea .diagram-delete-button,#exportArea .diagram-color-badge,#exportArea .diagram-inline-actions { display:none !important; }",
+          "#exportArea .diagram-node.diagram-selected { outline:none !important; }",
+          "#exportArea .diagram-measure-row { outline:none !important; background:transparent !important; box-shadow:none !important; }",
+          "#exportArea .diagram-connection-hit { display:none !important; }",
+          "@media print { #p0-actions { display:none !important; } #p0-page { margin:0 auto !important; break-inside:avoid !important; page-break-inside:avoid !important; } }"
+        ].join("\n");
+
+        // Only these dimensions and the legibility estimate cross into the
+        // isolated print window. No editor controls or event handlers travel.
+        var opts = {
+          fits:fit,
+          sheets:PAPER_SIZES,
+          recommended:recommended,
+          noSizeMeetsTarget:noSizeMeetsTarget,
+          minimumPt:MIN_MEASURE_PT
+        };
+        var run = [
+          '(function(){',
+          '"use strict";',
+          'var sizes='+JSON.stringify(opts)+';',
+          'window.p0ChoosePaper=function(size){',
+          'if(!sizes.fits[size]) return;',
+          'var f=sizes.fits[size];',
+          'var paper=sizes.sheets[size];',
+          'document.getElementById("p0-page-size").textContent="@page { size: "+paper.width+"mm "+paper.height+"mm; margin: 5mm; }";',
+          'document.getElementById("p0-paper").value=size;',
+          'document.getElementById("p0-page").style.width=f.shownWidth+"px";',
+          'document.getElementById("p0-page").style.height=f.shownHeight+"px";',
+          'document.getElementById("exportArea").style.setProperty("zoom",f.scale.toFixed(8),"important");',
+          'var info=document.getElementById("p0-print-quality");',
+          'var pt=f.measurePt.toFixed(2);',
+          'if(f.measurePt<sizes.minimumPt){',
+          'info.className="p0-warning";',
+          'info.textContent="READABILITY WARNING: estimated smallest measure text is "+pt+" pt on "+size+" landscape (below the "+sizes.minimumPt+" pt test threshold). "+',
+          '(sizes.noSizeMeetsTarget?"Even A1 is too small; reduce content or change layout.":"Recommended: "+sizes.recommended+" landscape.");',
+          '}else{',
+          'info.className="p0-good";',
+          'info.textContent="Estimated smallest measure text: "+pt+" pt on "+size+" landscape. Review the actual PDF at 100% before sharing.";',
+          '}',
+          'document.getElementById("p0-print-paper").textContent="Print / Save as PDF ("+size+")";',
+          '};',
+          'window.p0ChoosePaper("A3");',
+          '})();'
+        ].join("\n");
+        var recommendation = recommended !== "A3"
+          ? '<button type="button" id="p0-recommended" onclick="window.p0ChoosePaper(\''+recommended+'\')">Use recommended '+recommended+'</button>'
+          : "";
+        var markup = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Driver diagram — vector PDF</title>'+
+          copyStylesForPrint()+'<style>'+css+'</style>'+
+          '<style id="p0-page-size">@page { size:420mm 297mm; margin:5mm; }</style></head><body>'+
+          '<div id="p0-actions"><button id="p0-print-paper" type="button" onclick="window.print()">Print / Save as PDF (A3)</button>'+
+          '<label for="p0-paper">Paper size <select id="p0-paper" onchange="window.p0ChoosePaper(this.value)"><option value="A3">A3 landscape</option><option value="A2">A2 landscape</option><option value="A1">A1 landscape</option></select></label>'+
+          recommendation+
+          '<button type="button" onclick="window.close()">Close</button>'+
+          '<p id="p0-print-quality" role="status" aria-live="polite"></p></div>'+
+          '<div id="p0-page">'+clone.outerHTML+'</div>'+
+          '<script>'+run+'<\/script></body></html>';
+        preview.document.open();
+        preview.document.write(markup);
+        preview.document.close();
+      } catch (error) {
+        console.error("P0 print preview error",error);
+        try { preview.close(); } catch (ignore) {}
+        notify("Could not prepare the vector PDF: " + error.message);
+      }
+    });
+  }
+
+  function svgElement(tag, attributes) {
+    var result = document.createElementNS(SVG_NS, tag);
+    Object.keys(attributes || {}).forEach(function (key) {
+      if (attributes[key] != null) result.setAttribute(key, String(attributes[key]));
+    });
+    return result;
+  }
+
+  function svgRect(group, x, y, w, h, attrs) {
+    var shape = svgElement("rect", Object.assign({x:x,y:y,width:w,height:h}, attrs));
+    group.appendChild(shape);
+    return shape;
+  }
+
+  function exportSvgDiagram(area, canvas, connections) {
+    var full = getExportBounds(area);
+    var base = full.rect;
+    var width = full.width;
+    var height = full.height;
+    var root = svgElement("svg", {
+      xmlns: SVG_NS, version:"1.1", viewBox:"0 0 " + width + " " + height,
+      width:width, height:height, role:"img",
+      "aria-label":"Driver diagram with measures and legend"
+    });
+    root.appendChild(svgElement("title")).textContent = "Driver Diagram — vector export";
+    svgRect(root,0,0,width,height,{fill:"#ffffff"});
+    var position = function (rect) {
+      return { x:rect.left-base.left, y:rect.top-base.top,
+        width:rect.width,height:rect.height };
+    };
+    var diagramShell = document.getElementById("diagramCanvasWrapper");
+    if (diagramShell) {
+      var shell = position(diagramShell.getBoundingClientRect());
+      svgRect(root,shell.x,shell.y,shell.width,shell.height,{
+        fill:"#fafafa", stroke:"#e0e0e0","stroke-width":1,rx:6
+      });
+    }
+    // Import only visible vector connection paths, using the original geometry.
+    var canvasRect = canvas.getBoundingClientRect();
+    var linesGroup = svgElement("g", {
+      transform:"translate(" + (canvasRect.left-base.left) + " " +
+        (canvasRect.top-base.top) + ")"
+    });
+    connections.querySelectorAll(".diagram-connection-visible").forEach(function (path) {
+      linesGroup.appendChild(svgElement("path", {
+        d:path.getAttribute("d"), fill:"none", stroke:"#666",
+        "stroke-width":2.5, "stroke-linecap":"round"
+      }));
+    });
+    root.appendChild(linesGroup);
+
+    // Use *browser-rendered word positions* to preserve spaces and line breaks
+    // without html2canvas. Every word is individually positioned in native SVG.
+    function appendSvgText(element) {
+      if (!element || !element.getClientRects().length) return;
+      var style = window.getComputedStyle(element);
+      var group = svgElement("g", {"aria-label":element.textContent || ""});
+      var fontAttrs = {
+        fill:style.color, "font-family":style.fontFamily,
+        "font-size":style.fontSize, "font-weight":style.fontWeight,
+        "font-style":style.fontStyle,
+        "dominant-baseline":"text-before-edge"
+      };
+      var range = document.createRange();
+      var walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      var textNode, runs = [];
+      function addRun(word, rect, separated) {
+        if (!word || !rect || !rect.width || !rect.height) return;
+        runs.push({word:word, x:rect.left-base.left,
+          y:rect.top-base.top, separated:separated !== false});
+      }
+      while ((textNode = walker.nextNode())) {
+        var value = textNode.nodeValue || "";
+        var re = /\S+/gu, match;
+        while ((match = re.exec(value))) {
+          range.setStart(textNode,match.index);
+          range.setEnd(textNode,match.index+match[0].length);
+          var rects = range.getClientRects();
+          if (rects.length === 1) {
+            addRun(match[0],rects[0],true);
+          } else if (rects.length > 1) {
+            // Split only a genuinely wrapped long word into line fragments.
+            var index = match.index, lineTop = null;
+            var fragment = "", firstRect = null, firstFragment = true;
+            for (var ch of match[0]) {
+              range.setStart(textNode,index);
+              index += ch.length;
+              range.setEnd(textNode,index);
+              var charRect = range.getBoundingClientRect();
+              if (lineTop !== null && Math.abs(charRect.top-lineTop)>1.5) {
+                addRun(fragment,firstRect,firstFragment);
+                fragment="";
+                firstFragment=false;
+              }
+              if (!fragment) firstRect=charRect;
+              lineTop=charRect.top;
+              fragment+=ch;
+            }
+            addRun(fragment,firstRect,firstFragment);
+          }
+        }
+      }
+      // Keep the browser's actual line-break positions, but combine words
+      // on each line into ONE SVG text node. Individual word-positioned SVG
+      // elements can lose visible spaces in independent SVG renderers.
+      var lines=[];
+      runs.forEach(function (run) {
+        var line=lines.find(function (candidate) {
+          return Math.abs(candidate.y-run.y)<1.5;
+        });
+        if (!line) {
+          line={y:run.y, x:run.x, words:[]};
+          lines.push(line);
+        }
+        line.words.push(run);
+      });
+      lines.forEach(function (line) {
+        line.words.sort(function (a,b) { return a.x-b.x; });
+        var content=line.words.map(function (run,index) {
+          return (index && run.separated ? " " : "") + run.word;
+        }).join("");
+        if (style.textTransform === "uppercase") content=content.toUpperCase();
+        else if (style.textTransform === "lowercase") content=content.toLowerCase();
+        var text=svgElement("text",Object.assign({},fontAttrs,{
+          x:line.words[0].x,y:line.y
+        }));
+        text.textContent=content;
+        group.appendChild(text);
+      });
+      if (lines.length) root.appendChild(group);
+    }
+    // Headings.
+    area.querySelectorAll(".diagram-column-title").forEach(appendSvgText);
+
+    // Boxes (fill, border and native text).
+    area.querySelectorAll(".diagram-node").forEach(function (el) {
+      var p = position(el.getBoundingClientRect());
+      var style = window.getComputedStyle(el);
+      svgRect(root,p.x,p.y,p.width,p.height,{
+        fill:style.backgroundColor, stroke:style.borderTopColor,
+        "stroke-width":1, rx:4
+      });
+      svgRect(root,p.x,p.y,4,p.height,{fill:style.borderLeftColor});
+      appendSvgText(el.querySelector(".diagram-node-text"));
+    });
+    // Measures: vector bullet + browser-positioned words.
+    area.querySelectorAll(".diagram-measure-row").forEach(function (row) {
+      var bullet = row.firstElementChild;
+      var text = row.lastElementChild;
+      if (bullet) {
+        var br = position(bullet.getBoundingClientRect());
+        var bc = window.getComputedStyle(bullet);
+        root.appendChild(svgElement("circle",{
+          cx:br.x+br.width/2,cy:br.y+br.height/2,r:Math.min(3.5,br.height*.29),
+          fill:bc.color
+        }));
+      }
+      if (text && text!==bullet) appendSvgText(text);
+    });
+    // Only include visible legend, consistent with Hide key.
+    var legend = area.querySelector("#legendContainer");
+    if (legend && window.getComputedStyle(legend).display!=="none") {
+      legend.querySelectorAll(".legend-title").forEach(appendSvgText);
+      legend.querySelectorAll(".legend-item").forEach(function (row) {
+        var swatch = row.querySelector(".legend-color-swatch");
+        var label = row.lastElementChild;
+        if (swatch) {
+          var sw = position(swatch.getBoundingClientRect());
+          var sc = window.getComputedStyle(swatch);
+          svgRect(root,sw.x,sw.y,sw.width,sw.height,{
+            fill:sc.backgroundColor,stroke:sc.borderTopColor,
+            "stroke-width":1,rx:3
+          });
+        }
+        if (label && label!==swatch) appendSvgText(label);
+      });
+      var emptyLegend = legend.querySelector("#legendEmptyMessage");
+      if (emptyLegend && window.getComputedStyle(emptyLegend).display!=="none") {
+        appendSvgText(emptyLegend);
+      }
+    }
+    return root;
+  }
+
+  function prepareSvg() {
+    return new Promise(function (resolve,reject) {
+      getReadyDiagram(function (area,canvas,connections) {
+        try {resolve(exportSvgDiagram(area,canvas,connections));}
+        catch (e) { reject(e); }
+      });
+    });
+  }
+
+  function saveSvg() {
+    if (editingBlocked("exporting SVG")) return;
+    prepareSvg().then(function (svg) {
+      var content = new XMLSerializer().serializeToString(svg);
+      var blob = new Blob([content], {type:"image/svg+xml;charset=utf-8"});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href=url; a.download="driver-diagram.svg";
+      document.body.appendChild(a);
+      a.click(); a.remove();
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+    }).catch(function (error) {
+      console.error("P0 SVG export error",error);
+      notify("The SVG could not be created: " + error.message);
+    });
+  }
+
+
+  // Independent high-resolution PNG test; no html2canvas dependency.
+  function saveVectorPng() {
+    if (editingBlocked("exporting PNG")) return;
+    prepareSvg().then(function (svg) {
+      var content = new XMLSerializer().serializeToString(svg);
+      var svgUrl = URL.createObjectURL(new Blob([content], {
+        type:"image/svg+xml;charset=utf-8"
+      }));
+      return new Promise(function (resolve,reject) {
+        var image = new Image();
+        image.onload=function () {
+          try {
+            var width=Number(svg.getAttribute("width"));
+            var height=Number(svg.getAttribute("height"));
+            var scale=3;
+            var surface=document.createElement("canvas");
+            surface.width=Math.round(width*scale);
+            surface.height=Math.round(height*scale);
+            var ctx=surface.getContext("2d");
+            if (!ctx) throw new Error("The browser could not create a PNG canvas.");
+            ctx.fillStyle="#ffffff";
+            ctx.fillRect(0,0,surface.width,surface.height);
+            ctx.drawImage(image,0,0,surface.width,surface.height);
+            surface.toBlob(function (blob) {
+              if (blob) resolve(blob);
+              else reject(new Error("PNG encoding failed."));
+            },"image/png");
+          } catch (error) { reject(error); }
+          finally {URL.revokeObjectURL(svgUrl);}
+        };
+        image.onerror=function () {
+          URL.revokeObjectURL(svgUrl);
+          reject(new Error("The browser could not render the vector diagram."));
+        };
+        image.src=svgUrl;
+      });
+    }).then(function (blob) {
+      var url=URL.createObjectURL(blob);
+      var link=document.createElement("a");
+      link.href=url;
+      link.download="driver-diagram.png";
+      document.body.appendChild(link);
+      link.click();link.remove();
+      window.setTimeout(function () {URL.revokeObjectURL(url);},30000);
+    }).catch(function (error) {
+      console.error("P0 vector PNG export error",error);
+      notify("The experimental PNG export failed: " + error.message);
+    });
+  }
+
+  function install() {
+    var menu = document.getElementById("exportChartMenu");
+    if (!menu) return;
+
+    [
+      ["btnExportVectorPdf", printPreview],
+      ["btnExportVectorPng", saveVectorPng],
+      ["btnExportVectorSvg", saveSvg]
+    ].forEach(function (entry) {
+      var button = document.getElementById(entry[0]);
+      if (!button) return;
+      button.addEventListener("click", function () {
+        menu.open = false;
+        entry[1]();
+      });
+    });
+
+    // An open export menu should behave like a compact toolbar menu.
+    document.addEventListener("pointerdown", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    menu.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) {
+        event.preventDefault();
+        event.stopPropagation();
+        menu.open = false;
+        var summary = menu.querySelector("summary");
+        if (summary) summary.focus();
+      }
+    });
+  }
+
+  // Public methods support a small export regression suite.
+  window.driverExport = {
+    printPreview:printPreview,
+    prepareSvg:prepareSvg,
+    saveVectorPng:saveVectorPng,
+    saveSvg:saveSvg
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  } else {
+    install();
+  }
+})();

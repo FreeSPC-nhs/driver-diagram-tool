@@ -1,0 +1,2830 @@
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1.5rem;
+      background: #f5f5f5;
+    }
+
+    /* App header */
+    header.app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      background: #005eb8; /* NHS blue */
+      color: #ffffff;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      gap: 1rem;
+    }
+    .app-header h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.4rem;
+    }
+    .app-header .info {
+      margin: 0;
+      font-size: 0.85rem;
+      color: #e0ecff;
+      max-width: 700px;
+    }
+    .header-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      justify-content: flex-end;
+    }
+    .header-buttons button {
+      border-radius: 999px;
+      border: 1px solid #ffffff;
+      background: rgba(255,255,255,0.12);
+      color: #ffffff;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .header-buttons button:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      padding: 1rem 1.25rem;
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    input[type="text"],
+    select,
+    textarea,
+    input[type="color"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.4rem 0.5rem;
+      margin-bottom: 0.6rem;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font: inherit;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    input[type="color"] {
+      padding: 0;
+      height: 2rem;
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    button {
+      border: none;
+      border-radius: 4px;
+      padding: 0.4rem 0.8rem;
+      font: inherit;
+      cursor: pointer;
+      background: #005eb8;
+      color: #ffffff;
+    }
+    button.secondary {
+      background: #e8edf5;
+      color: #005eb8;
+    }
+    button.danger {
+      background: #d5281b;
+      color: #ffffff;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #666;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+
+/* Compact sidebar palette/key; editing takes place in the shared popup. */
+.colour-help-wrap { position:relative; display:inline-flex; align-items:center; }
+.colour-help-button {
+  width:21px; height:21px; padding:0; border:1px solid #c5d2df;
+  border-radius:50%; background:#fff; color:#475569;
+  font-size:14px; font-weight:700;
+}
+.colour-help-tooltip {
+  display:none; position:absolute; right:0; top:calc(100% + 5px);
+  width:235px; padding:10px 12px; z-index:100;
+  background:#263547; color:#fff; border-radius:7px;
+  box-shadow:0 5px 16px rgba(0,0,0,0.2); font-size:12px; line-height:1.4;
+}
+.colour-help-wrap:hover .colour-help-tooltip,
+.colour-help-wrap:focus-within .colour-help-tooltip { display:block; }
+.colour-help-button:focus-visible { outline:3px solid #ffbf47; outline-offset:2px; }
+#btnSidebarColourPalette {
+  display:inline-flex; align-items:center; gap:6px;
+  margin:0 0 0.5rem; border:1px solid #ccd8e6;
+  border-radius:6px; font-size:14px;
+}
+.colour-list-title { margin:0.65rem 0 0.5rem; font-size:0.95rem; font-weight:600; }
+.color-options-list { list-style:none; padding:0; margin:0; }
+.colour-options-empty { padding:0.4rem 0.1rem; color:#64748b; font-size:0.82rem; }
+.colour-option-row {
+  display:flex; align-items:center; gap:9px;
+  padding:7px 3px; border-bottom:1px solid #edf0f3;
+}
+.colour-option-swatch {
+  flex:none; width:21px; height:21px; box-sizing:border-box;
+  border:1px solid #94a3b8; border-radius:4px;
+}
+.colour-option-name {
+  flex:1; min-width:0; overflow-wrap:anywhere;
+  font-size:13px; color:#222; font-weight:500;
+}
+.colour-option-actions { display:inline-flex; align-items:center; gap:5px; }
+button.colour-row-button {
+  padding:5px 7px; border-radius:5px;
+  background:#e8edf5; color:#005eb8; font-size:12px;
+}
+button.colour-row-button:hover { background:#dce7f4; }
+button.colour-row-button.delete { background:transparent; color:#a61911; font-size:15px; }
+button.colour-row-button.delete:hover { background:#fff1f0; }
+.colour-visually-hidden {
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
+/* Save/open file controls */
+.file-actions {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.file-action-button {
+  appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.4rem;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  margin: 0;
+  padding: 0.45rem 0.8rem;
+
+  border: 1px solid transparent;
+  border-radius: 6px;
+
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Main recommended action */
+.file-action-button.primary {
+  background: #005eb8;
+  color: #ffffff;
+}
+
+.file-action-button.primary:hover {
+  background: #003d78;
+}
+
+/* Supporting actions */
+.file-action-button.secondary {
+  background: #e8edf5;
+  color: #005eb8;
+  border-color: #ccd8e6;
+}
+
+.file-action-button.secondary:hover {
+  background: #dbe5f2;
+}
+
+/* Override the general label styling */
+label.file-action-button {
+  display: inline-flex;
+  margin: 0;
+}
+
+/* Keyboard accessibility */
+.file-action-button:focus-visible {
+  outline: 3px solid rgba(0, 94, 184, 0.35);
+  outline-offset: 2px;
+}
+
+.file-help {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #555;
+}
+
+
+/* Button-like styling that can be used on <button>, <a>, <label>, etc. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+
+  border: 1px solid transparent;
+  transition: background 120ms ease, transform 60ms ease, box-shadow 120ms ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* Secondary style (matches your Upload CSV look, but slightly refined) */
+.btn.secondary {
+  background: #e8edf5;
+  color: #005eb8;
+  border-color: rgba(0, 94, 184, 0.15);
+}
+
+.btn.secondary:hover {
+  background: #dde6f2;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* Optional: keyboard focus */
+.btn:focus-visible {
+  outline: 3px solid rgba(0, 94, 184, 0.35);
+  outline-offset: 2px;
+}
+
+    /* Diagram styles */
+    #diagramCanvasWrapper {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 0.4rem;
+      margin-bottom: 0.75rem;
+      background: #fafafa;
+      min-height: 350px;
+    }
+    #diagramCanvas {
+      position: relative;
+      width: 100%;
+      min-height: 350px;
+    }
+    #diagramConnections {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    #diagramColumns {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 3.5rem;
+    }
+    
+    /* Columns now have a separate stack for their nodes */
+    .diagram-column {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .diagram-column-stack {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content:  space-between;
+    }
+
+    /* For the Aim column, centre its single node vertically */
+    .diagram-column.aim-column .diagram-column-stack {
+      justify-content: center;
+    }
+
+
+    .diagram-column-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.25rem;
+      color: #666;
+    }
+    .diagram-node {
+      position: relative;
+      background: #ffffff;
+      border-radius: 4px;
+      border: 1px solid #d0d7de;
+      padding: 0.25rem 1.2rem; /* extra space for +/- buttons */
+      font-size: 0.8rem;
+      line-height: 1.3;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+      cursor: pointer;
+      display: flex;         
+      align-items: center;
+    }
+    .diagram-node.level-aim {
+      border-left: 4px solid #005eb8;
+    }
+    .diagram-node.level-primary {
+      border-left: 4px solid #007f3b;
+    }
+    .diagram-node.level-secondary {
+      border-left: 4px solid #ff8c00;
+    }
+    .diagram-node.level-change {
+      border-left: 4px solid #a31e5c;
+    }
+        .diagram-add {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid #c0c0c0;
+      background: #ffffff;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #555;
+    }
+.diagram-delete {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+
+  opacity: 0;
+  pointer-events: none;
+}
+
+.diagram-node:hover .diagram-delete,
+.diagram-node:focus-within .diagram-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+    .diagram-add-left {
+      left: -10px;
+    }
+    .diagram-add-right {
+      right: -10px;
+    }
+     .diagram-color-badge {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      right: 15px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid #666;
+      background: #ffffff;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
+      cursor: pointer;
+    }
+
+	/* Hide colour badges and add/connect buttons in exported images */
+	.export-clean .diagram-color-badge,
+	.export-clean .diagram-add {
+	  display: none !important;
+	}
+
+
+    /* Hide colour badges when exporting */
+    .hide-badges .diagram-color-badge {
+      display: none;
+    }
+
+
+    /* Legend styles */
+    #legend {
+      margin-top: 0.5rem;
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+	/* Each legend block (e.g., Colour legend, Measures key) */
+	#legend .legend-block {
+	  min-width: 220px;             /* tweak if you want it tighter */
+ 	 flex: 1 1 260px;              /* grow/shrink nicely */
+	}
+    .legend-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+    }
+    #legendList {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      margin-bottom: 0rem;
+    }
+
+/* Put the list items into multiple columns where possible */
+#legendList,
+#measureKeyList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  column-gap: 14px;
+  row-gap: 4px;
+  margin-top: 4px;
+}
+
+    .legend-color-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid #666;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.35rem 0.4rem;
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+    }
+    th {
+      text-align: left;
+      font-weight: 600;
+      background: #f5f5f5;
+    }
+
+    @media (max-width: 900px) {
+      header.app-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .header-buttons {
+        justify-content: flex-start;
+      }
+    }
+
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      margin-bottom: 0.25rem;
+    }
+    .collapsible-header span:first-child {
+      flex: 1;
+    }
+    .collapsible-indicator {
+      font-size: 0.8rem;
+      color: #555;
+      margin-left: 0.5rem;
+    }
+    .collapsible-section {
+      margin-bottom: 0.75rem;
+    }
+    .collapsible-section.is-collapsed {
+      display: none;
+    }
+
+    /* Help / info modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-overlay.is-open {
+      display: flex;
+    }
+    .modal-dialog {
+      background: #ffffff;
+      max-width: 820px;
+      width: 90%;
+      max-height: 80vh;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      padding: 1.25rem 1.5rem;
+      overflow-y: auto;
+      position: relative;
+      font-size: 0.9rem;
+    }
+    .modal-dialog h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    .modal-dialog h3 {
+      margin-bottom: 0.25rem;
+      margin-top: 1rem;
+      font-size: 1rem;
+    }
+    .modal-dialog p {
+      margin-top: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .modal-dialog ul {
+      margin-top: 0.25rem;
+      margin-bottom: 0.5rem;
+      padding-left: 1.25rem;
+    }
+    .modal-close-btn {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.6rem;
+      border: none;
+      background: transparent;
+      color: #555;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .modal-close-btn:hover {
+      color: #000;
+    }
+    .faq-question {
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+
+
+    @media (max-width: 800px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      #diagramColumns {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+
+/* B1.2: Element selection and in-place text editing */
+
+#diagramSelectionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid #b8cce3;
+  border-radius: 6px;
+  background: #eef5fc;
+}
+
+#diagramSelectionBar[hidden],
+#diagramSelectionBar button[hidden] {
+  display: none !important;
+}
+
+#diagramSelectedDescription {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+#diagramEditFeedback {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: #334155;
+}
+
+#diagramEditFeedback:empty {
+  display: none;
+}
+
+.diagram-node.diagram-selected {
+  outline: 3px solid #005eb8;
+  outline-offset: 2px;
+}
+
+.diagram-node:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 3px;
+}
+
+.diagram-node .diagram-node-text {
+  white-space: pre-line;
+}
+
+.diagram-node .diagram-inline-text {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 64px;
+  min-height: 64px;
+  margin: 0;
+  padding: 5px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.3;
+  color: #111;
+  background: #fff;
+  border: 1px solid #005eb8;
+  border-radius: 4px;
+}
+
+.export-clean .diagram-node.diagram-selected {
+  outline: none;
+}
+
+
+/* B1.3: Contextual pencil editing button */
+
+.diagram-edit-pencil {
+  position: absolute;
+  top: -12px;
+  left: 8px;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  width: 26px;
+  height: 26px;
+  padding: 0;
+
+  border: 1px solid #005eb8;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #005eb8;
+
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  z-index: 5;
+  cursor: pointer;
+}
+
+/* Only show the pencil on the selected box */
+.diagram-node.diagram-selected:not(.diagram-text-editing)
+.diagram-edit-pencil {
+  display: inline-flex;
+}
+
+.diagram-edit-pencil:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+/* Never include editing controls in PNG/PDF exports */
+.export-clean .diagram-edit-pencil {
+  display: none !important;
+}
+
+
+/* B2.1 - Quick colour creation from context menu */
+
+.quick-colour-menu-divider {
+  height: 1px;
+  background: #eaeef2;
+  margin: 6px 0;
+}
+
+dialog.quick-colour-dialog {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 24px));
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.22);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+dialog.quick-colour-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.quick-colour-dialog h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.quick-colour-dialog .quick-colour-target {
+  font-size: 13px;
+  color: #475569;
+  overflow-wrap: anywhere;
+  margin-bottom: 16px;
+}
+
+.quick-colour-dialog label {
+  display: block;
+  font-weight: 600;
+  margin: 10px 0 5px;
+}
+
+.quick-colour-dialog input[type="color"] {
+  width: 100%;
+  height: 42px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.quick-colour-dialog .quick-colour-error {
+  color: #b91c1c;
+  font-size: 13px;
+  margin: 10px 0;
+}
+
+.quick-colour-dialog .quick-colour-error:empty {
+  display: none;
+}
+
+.quick-colour-dialog .quick-colour-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.quick-colour-dialog :focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+
+/* B2.2 — Direct measure selection */
+
+.diagram-measure-row {
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.diagram-measure-row:hover {
+  background: rgba(0, 94, 184, 0.06);
+}
+
+.diagram-measure-row.diagram-measure-selected {
+  outline: 2px solid #005eb8;
+  outline-offset: 2px;
+  background: rgba(0, 94, 184, 0.08);
+}
+
+.diagram-measure-row:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 3px;
+}
+
+/* Compact right-click menu for an individual measure */
+
+.diagram-measure-context-menu {
+  position: fixed;
+  z-index: 11000;
+  min-width: 170px;
+  padding: 5px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+}
+
+.diagram-measure-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  color: #111;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.diagram-measure-context-menu button:hover,
+.diagram-measure-context-menu button:focus-visible {
+  background: #eef5fc;
+}
+
+.diagram-measure-context-menu button:focus-visible {
+  outline: 2px solid #005eb8;
+  outline-offset: -2px;
+}
+
+/* Selection styling is for editing only, not exported diagrams. */
+
+.export-clean .diagram-measure-row {
+  background: transparent !important;
+  outline: none !important;
+}
+
+
+/* ==========================================
+   B2.3 — Contextual Add measure controls
+   ========================================== */
+
+.diagram-quick-add-measure {
+  position: absolute;
+  top: 100%;
+  right: 2px;
+  z-index: 10;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 4px 9px;
+
+  border: 1px solid #005eb8;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #005eb8;
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+/* Reveal on hover, keyboard focus or node selection */
+
+.diagram-item:hover .diagram-quick-add-measure,
+.diagram-item:focus-within .diagram-quick-add-measure,
+.diagram-item:has(.diagram-node.diagram-selected)
+  .diagram-quick-add-measure {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Keep the active item's button above nearby elements */
+
+.diagram-item:hover,
+.diagram-item:focus-within {
+  z-index: 5;
+}
+
+
+/* Hide during inline text editing */
+
+.diagram-item:has(.diagram-text-editing)
+.diagram-quick-add-measure {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Keyboard accessibility */
+
+.diagram-quick-add-measure:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+/* Never include in PNG or PDF exports */
+
+.export-clean .diagram-quick-add-measure {
+  display: none !important;
+}
+
+
+/* B2.3a — Distinct measure icon */
+
+.quick-add-measure-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.diagram-quick-add-measure {
+  border-radius: 16px;
+  white-space: nowrap;
+}
+
+
+/* B3.1 — Undo/Redo accessibility */
+
+.header-buttons button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.header-buttons button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 3px;
+}
+
+
+/* B3.3 — Individual connection formatting */
+
+#connectionFormatBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
+  background: #eef5fc;
+  border: 1px solid #b8cce3;
+  border-radius: 6px;
+}
+
+#connectionFormatBar[hidden] {
+  display: none !important;
+}
+
+#connectionFormatLabel {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+#connectionFormatBar label {
+  margin: 0;
+}
+
+#connectionFormatSelect {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+}
+
+/* Allow SVG lines to receive clicks in the gaps
+   while keeping the diagram boxes interactive. */
+
+#diagramConnections {
+  z-index: 1;
+  pointer-events: none;
+}
+
+#diagramColumns {
+  z-index: 2;
+  pointer-events: none;
+}
+
+#diagramColumns .diagram-item,
+#diagramColumns .diagram-column-title {
+  pointer-events: auto;
+}
+
+/* Wide invisible hit paths make lines easier to select. */
+
+#diagramConnections .diagram-connection-hit {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+#diagramConnections .diagram-connection-hit:focus-visible {
+  stroke: rgba(0, 94, 184, 0.25);
+}
+
+/* Export selected lines in their normal appearance. */
+
+.export-clean .diagram-connection-hit {
+  display: none !important;
+}
+
+.export-clean .diagram-connection-visible[data-selected="true"] {
+  stroke: #666 !important;
+  stroke-width: 2.5 !important;
+}
+
+
+/* B3.3a: Floating connection-style menu */
+
+#connectionFormatBar {
+  position: fixed;
+  z-index: 15000;
+  display: block;
+  width: min(270px, calc(100vw - 24px));
+  max-height: 75vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px;
+  margin: 0;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.22);
+  color: #111827;
+}
+
+#connectionFormatBar[hidden],
+#connectionFormatSelect[hidden] {
+  display: none !important;
+}
+
+.connection-popup-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.connection-popup-heading strong {
+  font-size: 14px;
+}
+
+#connectionFormatClear {
+  padding: 2px 8px;
+  background: transparent;
+  color: #475569;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+#connectionFormatClear:hover {
+  background: #edf2f7;
+}
+
+#connectionFormatLabel {
+  display: -webkit-box;
+  flex: none;
+  margin: 0 0 10px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.connection-style-options {
+  display: grid;
+  gap: 4px;
+}
+
+#connectionFormatBar .connection-style-choice {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #fff;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+
+#connectionFormatBar .connection-style-choice:hover {
+  background: #eef5fc;
+}
+
+#connectionFormatBar .connection-style-choice.is-active {
+  background: #1f2937;
+  color: #fff;
+}
+
+.connection-style-choice svg {
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.connection-style-default-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  font-size: 24px;
+}
+
+.connection-style-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.connection-style-name small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.connection-style-check {
+  display: none;
+  font-weight: 700;
+}
+
+.connection-style-choice.is-active
+.connection-style-check {
+  display: inline;
+}
+
+#connectionFormatBar button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+
+/* B3.4a — Save/Cancel directly inside edited boxes */
+
+.diagram-inline-editor {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diagram-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.diagram-node .diagram-inline-actions button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 21px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.diagram-inline-save {
+  background: #edf8f0;
+  border: 1px solid #16803c;
+  color: #16803c;
+}
+
+.diagram-inline-cancel {
+  background: #fff0ee;
+  border: 1px solid #ba352e;
+  color: #ba352e;
+}
+
+.diagram-node .diagram-inline-actions button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+.diagram-inline-feedback {
+  color: #a61911;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.diagram-inline-feedback:empty {
+  display: none;
+}
+
+/* Editing controls are never part of diagram exports */
+.export-clean .diagram-inline-actions {
+  display: none !important;
+}
+
+
+/* B3.4b — Mouse drag-to-reorder */
+
+.diagram-node[draggable="true"] {
+  cursor: grab;
+}
+
+.diagram-node.diagram-dragging {
+  opacity: 0.65;
+  outline: 2px dashed #005eb8;
+  outline-offset: 2px;
+  cursor: grabbing;
+}
+
+/* Blue insertion markers. No permanent spacing added. */
+
+.diagram-node.diagram-drop-before::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  border-top: 4px solid #005eb8;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.diagram-node.diagram-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  border-bottom: 4px solid #005eb8;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.diagram-node[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Do not export temporary drag indicators */
+
+.export-clean .diagram-node.diagram-dragging {
+  opacity: 1;
+  outline: none;
+}
+
+.export-clean .diagram-node.diagram-drop-before::before,
+.export-clean .diagram-node.diagram-drop-after::after {
+  display: none;
+}
+
+
+/* B4.1b.1 — Zoom and resize connection refresh notification */
+
+.zoom-redraw-notice {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 15000;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px;
+  padding-right: 32px;
+
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #b8cce3;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+
+  font-size: 13px;
+}
+
+.zoom-redraw-notice[hidden] {
+  display: none !important;
+}
+
+.zoom-redraw-notice span {
+  flex: 1 1 100%;
+  line-height: 1.4;
+}
+
+.zoom-redraw-notice .zoom-redraw-again {
+  background: #005eb8;
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.zoom-redraw-notice .zoom-redraw-close {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+
+  padding: 3px 8px;
+  background: transparent;
+  color: #475569;
+  font-size: 19px;
+}
+
+.zoom-redraw-notice .zoom-redraw-close:hover {
+  background: #edf2f7;
+}
+
+.zoom-redraw-notice button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+
+/* B4.2b — Colour picker inside the inline text editor */
+
+.diagram-node .diagram-inline-actions
+.diagram-inline-colour-button {
+  margin-right: auto;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+  color: #111827;
+  font-size: 17px;
+}
+
+.diagram-node .diagram-inline-actions
+.diagram-inline-colour-button:hover {
+  background: #f1f5f9;
+}
+
+/* Floating palette menu */
+
+.diagram-inline-colour-menu {
+  position: fixed;
+  z-index: 16000;
+  box-sizing: border-box;
+  width: min(250px, calc(100vw - 16px));
+  max-height: 65vh;
+  overflow-y: auto;
+  padding: 8px;
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.diagram-inline-colour-heading {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 8px 9px;
+}
+
+.diagram-inline-colour-choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px;
+  background: transparent;
+  color: #111827;
+  border: 0;
+  border-radius: 5px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.diagram-inline-colour-choice:hover,
+.diagram-inline-colour-choice:focus-visible {
+  background: #eef5fc;
+}
+
+.diagram-inline-colour-choice:focus-visible {
+  outline: 2px solid #005eb8;
+  outline-offset: -2px;
+}
+
+.diagram-inline-colour-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+}
+
+/* Exclude editing controls from diagrams captured for export. */
+
+.export-clean .diagram-inline-colour-button,
+.export-clean .diagram-inline-colour-menu {
+  display: none !important;
+}
+
+
+/* B4.2c — Delete icon on selected diagram elements */
+
+.diagram-delete-button {
+  position: absolute;
+  top: -12px;
+  right: 8px;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  width: 26px;
+  height: 26px;
+  padding: 0;
+
+  border: 1px solid #b42318;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #b42318;
+
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  z-index: 5;
+  cursor: pointer;
+}
+
+/* Only show the dustbin when a box is selected. */
+
+.diagram-node.diagram-selected:not(.diagram-text-editing)
+.diagram-delete-button {
+  display: inline-flex;
+}
+
+.diagram-delete-button:hover {
+  background: #fff0ee;
+}
+
+.diagram-delete-button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+/* Never include deletion controls in PNG/PDF exports. */
+
+.export-clean .diagram-delete-button {
+  display: none !important;
+}
+
+
+/* B4.2d — Drag to reorder individual measures */
+
+.diagram-measure-row.diagram-measure-sortable {
+  position: relative;
+  cursor: grab;
+}
+
+.diagram-measure-row.diagram-measure-sortable:active {
+  cursor: grabbing;
+}
+
+.diagram-measure-grip {
+  position: absolute;
+  left: -15px;
+  top: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.2;
+  opacity: 0.55;
+  user-select: none;
+}
+
+.diagram-measure-row:hover .diagram-measure-grip,
+.diagram-measure-row:focus-visible .diagram-measure-grip {
+  opacity: 1;
+  color: #005eb8;
+}
+
+.diagram-measure-row.diagram-measure-dragging {
+  opacity: 0.35;
+}
+
+/* Inset markers don't shift the measure layout. */
+
+.diagram-measure-row.diagram-measure-drop-before {
+  box-shadow: inset 0 2px 0 #005eb8;
+}
+
+.diagram-measure-row.diagram-measure-drop-after {
+  box-shadow: inset 0 -2px 0 #005eb8;
+}
+
+/* Keep exported diagrams free of editing controls. */
+
+.export-clean .diagram-measure-grip {
+  display: none !important;
+}
+
+.export-clean .diagram-measure-row {
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+
+/* B4.3b — Expandable Help sections */
+
+#helpOverlay .help-accordion {
+  margin: 0.45rem 0;
+  border: 1px solid #cbd9e8;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+#helpOverlay .help-accordion > summary {
+  display: block;
+  position: relative;
+  padding: 0.7rem 2.4rem 0.7rem 0.85rem;
+
+  background: #eef5fc;
+  color: #003b70;
+  font-weight: 600;
+
+  cursor: pointer;
+  list-style: none;
+}
+
+#helpOverlay .help-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+#helpOverlay .help-accordion > summary::after {
+  content: "+";
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+
+  font-size: 1.25rem;
+  font-weight: 400;
+}
+
+#helpOverlay .help-accordion[open] > summary::after {
+  content: "−";
+}
+
+#helpOverlay .help-accordion > summary:hover {
+  background: #e1effb;
+}
+
+#helpOverlay .help-accordion > summary:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: -3px;
+}
+
+#helpOverlay .help-accordion-content {
+  padding: 0.75rem 0.95rem;
+}
+
+#helpOverlay .help-accordion-content > :first-child {
+  margin-top: 0;
+}
+
+#helpOverlay .help-accordion-content > :last-child {
+  margin-bottom: 0;
+}
+
+
+/* B4.4a.1 — Diagram / Outline switch */
+
+#diagramViewSwitch {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 0.9rem;
+}
+
+#diagramViewSwitch button {
+  background: #e8edf5;
+  color: #005eb8;
+  border: 1px solid #b8cce3;
+}
+
+#diagramViewSwitch button[aria-pressed="true"] {
+  background: #005eb8;
+  color: #fff;
+}
+
+#diagramViewSwitch button:focus-visible,
+#diagramOutlineTree summary:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+#exportArea[hidden],
+#diagramOutlineView[hidden] {
+  display: none !important;
+}
+
+#diagramArea.is-outline-view #diagramSelectionBar,
+#diagramArea.is-outline-view #connectionFormatBar {
+  display: none !important;
+}
+
+/* Outline layout */
+
+#diagramOutlineView {
+  padding: 0.5rem 0;
+}
+
+#diagramOutlineView > p {
+  color: #555;
+  font-size: 0.85rem;
+}
+
+#diagramOutlineTree,
+#diagramOutlineTree ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+#diagramOutlineTree ul {
+  padding-left: 1.25rem;
+  margin-left: 0.55rem;
+  border-left: 1px solid #d9e2ed;
+}
+
+#diagramOutlineTree > li {
+  margin-bottom: 0.3rem;
+}
+
+#diagramOutlineTree details > summary,
+#diagramOutlineTree .diagram-outline-leaf {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid #e6ecf2;
+}
+
+#diagramOutlineTree details > summary {
+  cursor: pointer;
+}
+
+#diagramOutlineTree details > summary:hover {
+  background: #eef5fc;
+}
+
+#diagramOutlineTree .diagram-outline-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+/* Driver level labels */
+
+#diagramOutlineTree .diagram-outline-type {
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #222;
+  white-space: nowrap;
+}
+
+#diagramOutlineTree .diagram-outline-aim {
+  background: #fbdede;
+}
+
+#diagramOutlineTree .diagram-outline-primary {
+  background: #ffd792;
+}
+
+#diagramOutlineTree .diagram-outline-secondary {
+  background: #fff99b;
+}
+
+#diagramOutlineTree .diagram-outline-change {
+  background: #a8f99d;
+}
+
+#diagramOutlineTree .diagram-outline-swatch {
+  width: 11px;
+  height: 11px;
+  border: 1px solid #999;
+  border-radius: 3px;
+}
+
+#diagramOutlineTree .diagram-outline-text {
+  flex: 1 1 180px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#diagramOutlineTree .diagram-outline-extra {
+  color: #555;
+  font-size: 0.72rem;
+}
+
+/* Measures */
+
+#diagramOutlineTree .diagram-outline-measure {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+
+/* B4.4b — Click Outline text to locate an element */
+
+#diagramOutlineTree .diagram-outline-locate {
+  appearance: none;
+  display: inline;
+  flex: 1 1 180px;
+
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+
+  white-space: normal;
+  overflow-wrap: anywhere;
+
+  cursor: pointer;
+}
+
+#diagramOutlineTree .diagram-outline-locate:hover {
+  color: #005eb8;
+  text-decoration: underline;
+}
+
+#diagramOutlineTree .diagram-outline-locate:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 3px;
+}
+
+
+/* B4.4c — Direct text editing in Outline view */
+
+#diagramOutlineTree .diagram-outline-edit-button {
+  flex: 0 0 auto;
+  margin-left: 0.3rem;
+  padding: 0.2rem 0.55rem;
+
+  background: transparent;
+  color: #005eb8;
+  border: 1px solid #b8cce3;
+  border-radius: 5px;
+
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#diagramOutlineTree .diagram-outline-edit-button:hover {
+  background: #e8f2fc;
+}
+
+#diagramOutlineTree .diagram-outline-edit-button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+#diagramOutlineTree .diagram-outline-editor {
+  margin: 0.5rem 0.5rem 0.8rem 1.1rem;
+  padding: 0.8rem;
+
+  border: 1px solid #b8cce3;
+  border-radius: 7px;
+  background: #f7faff;
+}
+
+#diagramOutlineTree .diagram-outline-editor label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #003b70;
+}
+
+#diagramOutlineTree .diagram-outline-editor textarea {
+  display: block;
+  width: 100%;
+  min-height: 75px;
+  box-sizing: border-box;
+  padding: 0.6rem;
+
+  border: 1px solid #a8bacb;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #111111;
+
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+#diagramOutlineTree .diagram-outline-editor textarea:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+#diagramOutlineEditError {
+  margin: 0.35rem 0;
+  color: #b42318;
+  font-size: 0.82rem;
+}
+
+#diagramOutlineEditError:empty {
+  display: none;
+}
+
+#diagramOutlineTree .diagram-outline-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+
+/* B4.4d.1a — Keep Outline actions on the same line */
+
+#diagramOutlineTree .diagram-outline-row {
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+
+#diagramOutlineTree .diagram-outline-locate {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+#diagramOutlineTree .diagram-outline-edit-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+
+/* B4.4d.2–4 — Compact Outline actions and measure editing. */
+
+#diagramOutlineTree .diagram-outline-action-group {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+#diagramOutlineTree .diagram-outline-action-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 245px;
+  max-width: calc(100vw - 28px);
+  padding: 0.7rem;
+  border: 1px solid #b8cce3;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.17);
+  color: #111111;
+  white-space: normal;
+}
+
+#diagramOutlineTree .diagram-outline-action-menu[hidden] {
+  display: none !important;
+}
+
+#diagramOutlineTree .diagram-outline-action-menu button,
+#diagramOutlineTree .diagram-outline-action-menu select {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #b8cce3;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 0.83rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+#diagramOutlineTree .diagram-outline-action-menu button:hover {
+  background: #eef5fc;
+}
+
+#diagramOutlineTree .diagram-outline-action-menu .diagram-outline-delete-action {
+  color: #b42318;
+  border-color: #e8b1ab;
+}
+
+#diagramOutlineTree .diagram-outline-colour-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+#diagramOutlineTree .diagram-outline-colour-label select {
+  display: block;
+  margin-top: 0.3rem;
+  font-weight: 400;
+}
+
+#diagramOutlineTree .diagram-outline-action-menu :focus-visible,
+#diagramOutlineTree .diagram-outline-measure-edit:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+#diagramOutlineTree .diagram-outline-measure-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#diagramOutlineTree .diagram-outline-measure-edit {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid #b8cce3;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #005eb8;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+
+/* B4 completion — accessibility and responsive layout */
+
+#diagramOutlineStatus {
+  margin: 0.35rem 0;
+  font-size: 0.83rem;
+  color: #334155;
+}
+
+#diagramOutlineStatus:empty {
+  display: none;
+}
+
+@media (max-width: 900px) {
+
+  body {
+    padding: 0.65rem;
+  }
+
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.85rem;
+  }
+
+  #diagramArea,
+  #controlsPanel {
+    min-width: 0;
+  }
+
+  .card {
+    padding: 0.75rem;
+  }
+
+  .modal-dialog {
+    width: calc(100% - 24px);
+    box-sizing: border-box;
+    max-height: calc(100dvh - 24px);
+    padding: 1rem;
+  }
+
+  /* Preserve the four-column diagram hierarchy. */
+
+  #diagramCanvasWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #diagramCanvas {
+    min-width: 980px;
+  }
+
+  #diagramColumns {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2rem;
+  }
+
+  /* Give the exported diagram its complete width. */
+
+  #exportArea.export-clean {
+    width: 980px;
+    max-width: none;
+  }
+
+  #exportArea.export-clean #diagramCanvasWrapper {
+    overflow: visible;
+  }
+
+  /* Larger touch targets. */
+
+  #diagramViewSwitch button,
+  #diagramOutlineTree .diagram-outline-edit-button,
+  #diagramOutlineTree .diagram-outline-measure-edit,
+  #diagramOutlineTree .diagram-outline-action-menu button,
+  #diagramOutlineTree .diagram-outline-action-menu select {
+    min-height: 44px;
+  }
+
+  /* Outline should fit narrow screens without clipping. */
+
+  #diagramOutlineTree ul {
+    padding-left: 0.75rem;
+    margin-left: 0.25rem;
+  }
+
+  #diagramOutlineTree .diagram-outline-row {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  #diagramOutlineTree .diagram-outline-locate {
+    flex: 1 1 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0.35rem 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  #diagramOutlineTree .diagram-outline-action-group {
+    display: flex;
+    flex: 1 1 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Keep the Actions menu within the narrow page. */
+
+  #diagramOutlineTree .diagram-outline-action-menu {
+    position: static;
+    width: min(100%, 280px);
+    box-sizing: border-box;
+    margin-top: 0.35rem;
+    box-shadow: none;
+  }
+}
+
+
+/* B5.3a — Optional AI guidance and information-governance safeguards. */
+
+#aiGuidanceDialog .ai-assistance {
+  margin: 0.9rem 0 1rem;
+  border: 1px solid #bfd3e5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+#aiGuidanceDialog .ai-assistance > summary {
+  padding: 0.8rem;
+  background: #eef5fc;
+  color: #003b70;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#aiGuidanceDialog .ai-assistance > summary span {
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+#aiGuidanceDialog .ai-assistance > summary:focus-visible,
+#aiGuidanceDialog .ai-scenario > summary:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+#aiGuidanceDialog .ai-assistance-content {
+  padding: 0.85rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+#aiGuidanceDialog .ai-assistance-content > p:first-child {
+  margin-top: 0;
+}
+
+#aiGuidanceDialog .ai-assistance-content h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.92rem;
+}
+
+#aiGuidanceDialog .ai-ig-warning {
+  padding: 0.75rem;
+  border-left: 4px solid #b42318;
+  border-radius: 5px;
+  background: #fff7f5;
+  color: #3e2422;
+}
+
+#aiGuidanceDialog .ai-ig-warning > summary {
+  padding: 0.1rem 0;
+  font-weight: 700;
+  color: #912018;
+  cursor: pointer;
+}
+
+#aiGuidanceDialog .ai-ig-warning > summary:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 3px;
+}
+
+#aiGuidanceDialog .ai-ig-warning-content {
+  padding-top: 0.65rem;
+}
+#aiGuidanceDialog .ai-ig-warning p {
+  margin: 0 0 0.6rem;
+}
+
+#aiGuidanceDialog .ai-ig-warning p:last-child {
+  margin-bottom: 0;
+}
+
+#aiGuidanceDialog .ai-scenarios {
+  display: grid;
+  gap: 0.4rem;
+}
+
+#aiGuidanceDialog .ai-scenario {
+  border: 1px solid #cbd9e8;
+  border-radius: 6px;
+}
+
+#aiGuidanceDialog .ai-scenario > summary {
+  padding: 0.6rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: #003b70;
+}
+
+#aiGuidanceDialog .ai-scenario[open] > summary {
+  background: #eef5fc;
+}
+
+#aiGuidanceDialog .ai-scenario > p {
+  margin: 0;
+  padding: 0.65rem;
+}
+
+#aiGuidanceDialog .ai-privacy-note,
+#aiGuidanceDialog .ai-workflow-note,
+#aiGuidanceDialog .ai-next-step {
+  margin: 0.85rem 0;
+}
+
+#aiGuidanceDialog .ai-guidance-links a {
+  color: #005eb8;
+  text-decoration: underline;
+}
+
+
+/* B5.3a.1 — AI guidance modal */
+
+#aiGuidanceDialog {
+  box-sizing: border-box;
+  width: min(900px, calc(100vw - 28px));
+  max-height: min(88dvh, 920px);
+  padding: 0;
+  overflow: auto;
+
+  border: 1px solid #b8cce3;
+  border-radius: 12px;
+
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+#aiGuidanceDialog::backdrop {
+  background: rgba(15, 23, 42, 0.58);
+}
+
+/* Header and close button */
+
+#aiGuidanceDialog .ai-guidance-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 16px 20px;
+  background: #005eb8;
+  color: #ffffff;
+}
+
+#aiGuidanceDialog .ai-guidance-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #ffffff;
+}
+
+#aiGuidanceDialog #btnCloseAiGuidance {
+  flex-shrink: 0;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+
+  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: 6px;
+  background: transparent;
+  color: #ffffff;
+
+  font-size: 25px;
+  cursor: pointer;
+}
+
+#aiGuidanceDialog #btnCloseAiGuidance:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+#aiGuidanceDialog #btnCloseAiGuidance:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+/* Reuse the existing AI guidance content */
+
+#aiGuidanceDialog .ai-assistance {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+}
+
+/* Hide the old side-panel heading inside the modal. */
+
+#aiGuidanceDialog #aiAssistancePanel > summary {
+  display: none;
+}
+
+#aiGuidanceDialog .ai-assistance-content {
+  padding: clamp(14px, 3vw, 26px);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+/* Show scenarios in columns on wider screens. */
+
+@media (min-width: 700px) {
+  #aiGuidanceDialog .ai-scenarios {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+/* Adapt the modal for smaller screens. */
+
+@media (max-width: 600px) {
+  #aiGuidanceDialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  #aiGuidanceDialog .ai-guidance-header {
+    padding: 12px 14px;
+  }
+
+  #aiGuidanceDialog .ai-scenarios {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+/* B5.3b — Prompt builder inside AI guidance modal. */
+#aiGuidanceDialog .ai-prompt-builder {
+  margin: 1rem 0;
+  padding: clamp(12px, 2vw, 20px);
+  border: 1px solid #b8cce3;
+  border-radius: 8px;
+  background: #f7faff;
+}
+#aiGuidanceDialog .ai-prompt-builder > h3 { margin-top: 0; }
+#aiGuidanceDialog .ai-builder-privacy {
+  padding: 0.7rem;
+  border-left: 3px solid #b42318;
+  background: #fff7f5;
+}
+#aiGuidanceDialog .ai-builder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0.9rem 0;
+}
+#aiGuidanceDialog .ai-builder-grid > div { min-width: 0; }
+#aiGuidanceDialog .ai-builder-grid label,
+#aiGuidanceDialog label[for="aiPromptEditor"] {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+#aiGuidanceDialog .ai-builder-grid select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 0.4rem;
+  border: 1px solid #9aaabd;
+  border-radius: 5px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+#aiGuidanceDialog .ai-builder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+#aiGuidanceDialog .ai-builder-actions button { min-height: 40px; }
+#aiGuidanceDialog #aiPromptEditor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 280px;
+  padding: 0.75rem;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  color: #111;
+  font: 0.88rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  resize: vertical;
+}
+#aiGuidanceDialog .ai-builder-status { min-height: 1.2em; color: #334155; }
+#aiGuidanceDialog .ai-builder-footnote { font-size: 0.83rem; color: #475569; }
+#aiGuidanceDialog .ai-prompt-builder :focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+@media (max-width: 650px) {
+  #aiGuidanceDialog .ai-builder-grid { grid-template-columns: minmax(0, 1fr); }
+  #aiGuidanceDialog .ai-builder-actions button { width: 100%; }
+}
+
+
+/* B5.3b.1 — Copy prompt confirmation. */
+
+#aiGuidanceDialog .ai-copy-feedback {
+  align-self: center;
+  padding: 0.35rem 0;
+  color: #007f3b;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+#aiGuidanceDialog .ai-copy-feedback.is-error {
+  color: #a61911;
+}
+
+#aiGuidanceDialog .ai-copy-feedback[hidden] {
+  display: none !important;
+}
+
+/* B5.3c — Paste AI-generated CSV. */
+
+#aiGuidanceDialog .ai-csv-paste {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 2px solid #d6e4f2;
+}
+
+#aiGuidanceDialog #aiCsvPasteInput {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 170px;
+  padding: 0.75rem;
+
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+
+  color: #111827;
+  background: #ffffff;
+
+  font: 0.85rem/1.5 ui-monospace,
+        SFMono-Regular, Consolas, monospace;
+
+  resize: vertical;
+}
+
+#aiGuidanceDialog #aiCsvPasteStatus {
+  min-height: 1.2em;
+  color: #334155;
+}
+
+#aiGuidanceDialog .ai-csv-safety {
+  font-size: 0.83rem;
+  color: #475569;
+}
+
+#aiGuidanceDialog .ai-csv-paste :focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+
+/* Shared 24-colour popup — sidebar Add, sidebar Edit and element palette. */
+dialog.quick-colour-dialog {
+  box-sizing:border-box; width:min(420px, calc(100vw - 24px));
+  max-height:min(90vh, 740px); overflow-y:auto;
+  padding:18px; border-radius:13px; border:1px solid #cbd5e1;
+  background:#fff; color:#111827;
+}
+.quick-colour-header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.quick-colour-dialog .quick-colour-header h2 { margin:0; font-size:20px; }
+.quick-colour-dialog .quick-colour-close {
+  background:transparent; color:#475569; font-size:25px;
+  padding:0 5px; line-height:1.1;
+}
+.quick-colour-dialog .quick-colour-close:hover { background:#eef3f8; }
+.quick-colour-dialog .quick-colour-target {
+  font-size:12px; color:#64748b; margin:6px 0 8px;
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+}
+.quick-colour-dialog .quick-colour-target[hidden],
+.quick-colour-dialog .quick-colour-remove[hidden] { display:none !important; }
+.quick-colour-dialog .quick-colour-field-label {
+  display:block; font-size:13px; font-weight:600; margin:16px 0 7px;
+}
+.quick-colour-grid {
+  display:grid; grid-template-columns:repeat(8,minmax(0,1fr));
+  gap:6px; margin:0 0 12px;
+}
+.quick-colour-tile {
+  appearance:none; box-sizing:border-box; min-width:0; aspect-ratio:1;
+  display:grid; place-items:center; padding:3px;
+  border:1px solid #cbd5e1; border-radius:6px;
+  background:#fff; cursor:pointer;
+}
+.quick-colour-tile:hover { border-color:#005eb8; }
+.quick-colour-tile[aria-pressed="true"] { border:3px solid #005eb8; padding:1px; }
+.quick-colour-tile-swatch {
+  display:block; box-sizing:border-box; width:100%; height:100%;
+  min-height:0; border:1px solid rgba(0,0,0,0.10);
+  border-radius:4px; font-size:0;
+}
+.quick-colour-tile[aria-pressed="true"] .quick-colour-tile-swatch {
+  outline:2px solid #fff; outline-offset:-4px;
+}
+.quick-colour-selection-row {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin:4px 0 10px;
+}
+.quick-colour-custom { margin:0; padding:0; border:0; min-width:0; }
+.quick-colour-custom summary {
+  display:inline-flex; align-items:center; padding:7px 10px;
+  border:1px solid #d0d7de; border-radius:6px;
+  background:#fff; color:#005eb8; font-weight:500; font-size:13px;
+  cursor:pointer; list-style:none;
+}
+.quick-colour-custom summary::-webkit-details-marker { display:none; }
+.quick-colour-custom summary:hover { background:#f1f5f9; }
+.quick-colour-custom[open] summary { margin-bottom:5px; }
+.quick-colour-custom label { display:block; font-size:11px; color:#475569; margin-bottom:3px; }
+.quick-colour-dialog .quick-colour-custom input[type="color"] {
+  display:block; width:110px; height:40px; padding:2px; margin:0;
+}
+.quick-colour-current {
+  margin-left:auto; display:inline-flex; align-items:center;
+  gap:7px; white-space:nowrap; color:#475569;
+  font:12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.quick-colour-preview { width:21px; height:21px; border:1px solid #94a3b8; border-radius:4px; }
+.quick-colour-dialog #quickColourName {
+  box-sizing:border-box; display:block; width:100%; margin:0;
+  padding:10px; border:1px solid #94a3b8; border-radius:6px;
+  font:inherit; font-size:14px;
+}
+.quick-colour-dialog .quick-colour-actions { margin-top:16px; gap:8px; }
+.quick-colour-dialog .quick-colour-remove {
+  margin-right:auto; background:transparent; color:#a61911;
+  border:1px solid #e8b1ab; font-size:12px; padding:7px;
+}
+.quick-colour-dialog .quick-colour-remove:hover { background:#fff1f0; }
+.quick-colour-dialog .quick-colour-error { margin:7px 0 0; color:#b91c1c; }
+.quick-colour-dialog .quick-colour-error:empty { display:none; }
+.quick-colour-dialog #quickColourSave:disabled { opacity:.5; cursor:not-allowed; }
+.quick-colour-dialog :focus-visible { outline:3px solid #ffbf47; outline-offset:2px; }
+@media (max-width:380px) {
+  dialog.quick-colour-dialog { padding:12px; }
+  .quick-colour-grid { grid-template-columns:repeat(6,minmax(0,1fr)); gap:5px; }
+  .quick-colour-selection-row { flex-wrap:wrap; }
+}
+
+
+/* Outline: expandable saved-colour menu (replaces dropdown). */
+
+#diagramOutlineTree .diagram-outline-colour-details {
+  border: 1px solid #b8cce3;
+  border-radius: 5px;
+  background: #fff;
+}
+
+#diagramOutlineTree .diagram-outline-colour-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.83rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+#diagramOutlineTree .diagram-outline-colour-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+#diagramOutlineTree .diagram-outline-colour-details > summary::after {
+  content: "▸";
+  color: #475569;
+}
+
+#diagramOutlineTree .diagram-outline-colour-details[open] > summary::after {
+  content: "▾";
+}
+
+#diagramOutlineTree .diagram-outline-colour-choices {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border-top: 1px solid #e5e7eb;
+}
+
+#diagramOutlineTree .diagram-outline-action-menu .diagram-outline-colour-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  padding: 8px;
+}
+
+#diagramOutlineTree .diagram-outline-colour-swatch {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #b6c0c8;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+#diagramOutlineTree .diagram-outline-colour-current {
+  margin-left: auto;
+  color: #005eb8;
+  font-weight: 700;
+}
+
+
+
+/* ---------- Production export dropdown and unobtrusive panel/key toggles ---------- */
+
+.toolbar-icon-button svg { display: block; }
+.toolbar-icon-button[aria-expanded="true"] .panel-open-indicator { display: none; }
+.toolbar-icon-button[aria-expanded="false"] .panel-close-indicator { display: none; }
+
+.export-chart-menu {
+  position: relative;
+  align-self: flex-start;
+  z-index: 16000;
+}
+.header-buttons .export-chart-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #fff;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.export-chart-menu > summary::-webkit-details-marker { display: none; }
+.export-chart-menu[open] > summary,
+.export-chart-menu > summary:hover { background: rgba(255,255,255,0.2); }
+.export-chart-menu > summary:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+.export-chart-choices {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 7px);
+  box-sizing: border-box;
+  width: min(280px, calc(100vw - 24px));
+  padding: 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 10px 28px rgba(0,0,0,.22);
+}
+.header-buttons .export-chart-choices button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  gap: 2px;
+  margin: 0;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  color: #111827;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  text-align: left;
+  white-space: normal;
+}
+.export-chart-choices button strong { font-size: 13px; }
+.export-chart-choices button small { font-size: 11px; color: #526174; }
+.header-buttons .export-chart-choices button:hover,
+.header-buttons .export-chart-choices button:focus-visible {
+  background: #eaf3ff;
+  outline-offset: -2px;
+}
+
+/* The key icon sits just below the visible key (or diagram if hidden).
+   Keeping it outside #exportArea means it never appears in exported files. */
+#diagramExportShell { position: relative; margin-bottom: 34px; }
+#toggleLegendBtn.key-visibility-icon {
+  position: absolute;
+  right: 3px;
+  bottom: -30px;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 30px;
+  height: 28px;
+  padding: 3px;
+  border: 1px solid #b8cce3;
+  border-radius: 6px;
+  background: #eef5fc;
+  color: #005eb8;
+}
+#toggleLegendBtn:hover { background: #dbeafe; }
+#toggleLegendBtn:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+#toggleLegendBtn[aria-pressed="true"] .key-hidden-slash { display: none; }
+#diagramArea.is-outline-view #diagramExportShell { display: none !important; }
+
+
+/* Sidebar toggle next to the editing panel, not in the blue header. */
+#sidebarDock {
+  position: relative;
+  min-width: 0;
+}
+
+.sidebar-toggle-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.sidebar-toggle-row .toolbar-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 36px;
+  height: 32px;
+  padding: 4px;
+  border: 1px solid #b8cce3;
+  border-radius: 6px;
+  background: #eef5fc;
+  color: #005eb8;
+}
+.sidebar-toggle-row .toolbar-icon-button:hover { background: #dbeafe; }
+.sidebar-toggle-row .toolbar-icon-button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+/* When hidden, preserve a narrow rail so the icon can reopen the panel. */
+main.sidebar-collapsed {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 0.7rem;
+}
+
+/* At mobile widths, keep one column and a small control row above the diagram. */
+@media (max-width: 900px) {
+  main.sidebar-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  main.sidebar-collapsed .sidebar-toggle-row {
+    justify-content: flex-start;
+    margin-bottom: 0;
+  }
+}
+
+/* v1.0 release: accessible sidebar section buttons and compact colour help. */
+#controlsPanel h2.collapsible-heading {
+  margin: 0 0 0.25rem;
+}
+#controlsPanel button.collapsible-header {
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+#controlsPanel button.collapsible-header:hover {
+  background: #f1f5f9;
+}
+#controlsPanel button.collapsible-header:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+#controlsPanel button.collapsible-header .collapsible-indicator {
+  flex: none;
+}
+.colour-add-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0.25rem 0 0.65rem;
+}
+.colour-add-row #btnSidebarColourPalette { margin: 0; }
